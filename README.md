@@ -10,14 +10,20 @@ fiskekunnskap.
 ## Hva den gjør
 
 1. **🗺️ Velg lokasjon** – klikk i kartet (Leaflet/OpenStreetMap) eller bruk GPS.
-2. **🌤️ Sanntidsforhold** – henter vær fra [MET Norway (met.no)](https://api.met.no):
+2. **🌊 Vanntype** – appen slår opp i OpenStreetMap (Overpass) hva slags vann du
+   trykket på og viser hva som finnes i området: **innsjø, elv/bekk, fjord/kystsjø,
+   åpent hav** eller **brakkvann** (elvemunning) – og om det er **ferskvann,
+   saltvann eller brakkvann**. Artslista filtreres til arter som faktisk hører
+   hjemme der.
+3. **🌤️ Sanntidsforhold** – henter vær fra [MET Norway (met.no)](https://api.met.no):
    lufttemperatur, skydekke, vind, lufttrykk + trykktrend og nedbør. Sol- og
    lysforhold (solhøyde, soloppgang/-nedgang, gylden time, midnattssol/mørketid)
    beregnes lokalt.
-3. **🐟 Velg art** – 12 vanlige norske ferskvanns- og saltvannsarter.
-4. **🧠 Anbefaling** – en **aktivitetsindeks (0–100)** for hvor gode forholdene er,
-   pluss de 4 beste agnene med foreslått **størrelse, farge, dybde og innspinningsfart**
-   – og en forklaring på *hvorfor*.
+4. **🐟 Velg art** – 12 vanlige norske ferskvanns- og saltvannsarter.
+5. **🧠 Anbefaling** – en **aktivitetsindeks (0–100)** for hvor gode forholdene er,
+   pluss de 4 beste agnene (score 0–100) med foreslått **størrelse, farge, dybde og
+   innspinningsfart**, en forklaring på *hvorfor*, og **tips & triks** – både
+   generelle, art-spesifikke og tilpasset forholdene og vanntypen.
 
 ## Kunnskapen bak
 
@@ -33,6 +39,7 @@ Anbefalingsmotoren er regelbasert og forklarbar. Den vekter blant annet:
 | **Nedbør** | Lett regn gir ofte godt bett; kraftig regn kan grumse vannet. |
 | **Sesong** | Hver art har en hovedsesong. |
 | **Vannklarhet** | Styrer fargevalg (naturlig/sølv i klart vann, kontrast/signalfarger i grumsete) og agn-action. |
+| **Vanntype / salinitet** | Ferskvann, saltvann og brakkvann har ulike arter. Velger du en art som ikke hører hjemme i vannet (f.eks. gjedde i åpent hav), nedjusteres indeksen kraftig og du får en advarsel. Brakkvann gir egne tips om elvemunning og tidevann. |
 
 Artsprofiler ligger i [`src/engine/species.js`](src/engine/species.js),
 agnkatalog i [`src/engine/lures.js`](src/engine/lures.js), og selve scoringen i
@@ -59,23 +66,29 @@ Utvikling med auto-restart: `npm run dev`. Kjør testene: `npm test`.
 ## Arkitektur
 
 ```
-server.js              Express: serverer frontend + API, proxy mot met.no
+server.js              Express: serverer frontend + API, proxy mot met.no + Overpass
 src/engine/
   solar.js             Sol-/lysberegning (lokalt, ingen API)
-  species.js           Artsprofiler (norsk fiskekunnskap)
+  water.js             Vann-/områdeklassifisering (innsjø/elv/fjord/hav/brakkvann)
+  species.js           Artsprofiler m/ salinitet, habitat og tips (norsk fiskekunnskap)
   lures.js             Agnkatalog + fargeregler
-  recommend.js         Anbefalingsmotor (aktivitetsindeks + agn-scoring)
-public/                Frontend (kart, skjema, resultat)
-test/                  Tester (node:test)
+  recommend.js         Anbefalingsmotor (aktivitetsindeks + agn-scoring + tips)
+public/                Frontend (kart, område, skjema, resultat)
+test/                  Tester (node:test) – 23 stk
 ```
 
 ### API
 
-- `GET /api/species` – liste over arter.
+- `GET /api/species` – liste over arter (med salinitet og habitat).
+- `GET /api/area?lat=&lon=` – klassifiserer vannet (ferskvann/saltvann/brakkvann,
+  innsjø/elv/fjord/hav) via OpenStreetMap, og hvilke arter som passer der.
 - `GET /api/conditions?lat=&lon=` – vær + lysforhold for posisjonen.
-- `POST /api/recommend` – `{ species, lat, lon, waterTemp?, waterClarity?, override? }`
-  → aktivitetsindeks + rangerte agn. Faller tilbake på manuelle verdier hvis
-  met.no ikke er tilgjengelig.
+- `POST /api/recommend` – `{ species, lat, lon, salinity?, waterType?, waterTemp?, waterClarity?, override? }`
+  → aktivitetsindeks + rangerte agn + tips. Faller tilbake på manuelle verdier hvis
+  met.no/Overpass ikke er tilgjengelig.
+
+> Vanntype-oppslaget bruker [Overpass API](https://overpass-api.de) (OpenStreetMap).
+> Svar caches i 24 t for å være snill mot tjenesten.
 
 ## Lisens
 

@@ -14,7 +14,8 @@ import { fileURLToPath } from 'node:url';
 
 import { lightConditions } from './src/engine/solar.js';
 import { recommend } from './src/engine/recommend.js';
-import { listSpecies } from './src/engine/species.js';
+import { listSpecies, speciesForWater } from './src/engine/species.js';
+import { buildOverpassQuery, classifyArea } from './src/engine/water.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -28,6 +29,42 @@ const MET_UA = process.env.MET_USER_AGENT || 'Fiskeguru/1.0 github.com/runarkh/f
 // Enkel in-memory cache for å være snill mot met.no (de ber om caching).
 const cache = new Map();
 const CACHE_MS = 10 * 60 * 1000;
+
+// Egen, lengre cache for vann-/områdeoppslag (OSM endrer seg sjelden).
+const areaCache = new Map();
+const AREA_CACHE_MS = 24 * 60 * 60 * 1000;
+const OVERPASS_ENDPOINTS = [
+  'https://overpass-api.de/api/interpreter',
+  'https://overpass.kumi.systems/api/interpreter',
+];
+
+// Klassifiserer vannet på en posisjon via Overpass (OpenStreetMap).
+async function fetchArea(lat, lon) {
+  const key = `${lat.toFixed(4)},${lon.toFixed(4)}`;
+  const hit = areaCache.get(key);
+  if (hit && Date.now() - hit.t < AREA_CACHE_MS) return hit.data;
+
+  const query = buildOverpassQuery(lat, lon);
+  let lastErr;
+  for (const url of OVERPASS_ENDPOINTS) {
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'User-Agent': MET_UA, 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: 'data=' + encodeURIComponent(query),
+        signal: AbortSignal.timeout(28000),
+      });
+      if (!res.ok) throw new Error(`Overpass svarte ${res.status}`);
+      const json = await res.json();
+      const data = classifyArea(json.elements || []);
+      areaCache.set(key, { t: Date.now(), data });
+      return data;
+    } catch (e) {
+      lastErr = e;
+    }
+  }
+  throw lastErr || new Error('Overpass utilgjengelig');
+}
 
 async function fetchWeather(lat, lon) {
   const key = `${lat.toFixed(3)},${lon.toFixed(3)}`;
@@ -84,6 +121,24 @@ app.get('/api/species', (_req, res) => {
   res.json(listSpecies());
 });
 
+// Hva slags vann er det her? (innsjø/elv/fjord/hav/brakkvann) + hva finnes i området.
+app.get('/api/area', async (req, res) => {
+  const lat = parseFloat(req.query.lat);
+  const lon = parseFloat(req.query.lon);
+  if (Number.isNaN(lat) || Number.isNaN(lon)) {
+    return res.status(400).json({ error: 'Mangler gyldig lat/lon' });
+  }
+  try {
+    const water = await fetchArea(lat, lon);
+    const matchingSpecies = water.salinity && water.salinity !== 'unknown'
+      ? speciesForWater(water.salinity, water.type)
+      : [];
+    res.json({ lat, lon, water, matchingSpecies });
+  } catch (e) {
+    res.json({ lat, lon, water: null, areaError: e.message, matchingSpecies: [] });
+  }
+});
+
 // Henter rådende forhold (vær + lys) for en posisjon.
 app.get('/api/conditions', async (req, res) => {
   const lat = parseFloat(req.query.lat);
@@ -114,7 +169,7 @@ app.get('/api/conditions', async (req, res) => {
 // henter den live fra met.no.
 app.post('/api/recommend', async (req, res) => {
   try {
-    const { species, lat, lon, when, waterTemp, waterClarity, override } = req.body || {};
+    const { species, lat, lon, when, waterTemp, waterClarity, salinity, waterType, override } = req.body || {};
     if (!species) return res.status(400).json({ error: 'Mangler art (species)' });
     if (lat == null || lon == null) return res.status(400).json({ error: 'Mangler lat/lon' });
 
@@ -139,6 +194,8 @@ app.post('/api/recommend', async (req, res) => {
       precip: ov.precip ?? weather?.precip ?? null,
       waterTemp: waterTemp ?? null,
       waterClarity: waterClarity || 'stained',
+      salinity: salinity || null,
+      waterType: waterType || null,
     };
 
     const result = recommend(species, conditions);

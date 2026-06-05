@@ -23,6 +23,7 @@
         <button id="geo-btn" class="ghost">📍 Bruk min posisjon</button>
         <span id="coords" class="coords">Ingen posisjon valgt</span>
       </div>
+      <div id="area-card" class="area-card" hidden></div>
     </section>
 
     <section class="panel" id="step-conditions">
@@ -41,6 +42,14 @@
               <option value="clear">Klart</option>
               <option value="stained" selected>Litt farget</option>
               <option value="murky">Grumsete</option>
+            </select>
+          </label>
+          <label>Vanntype (overstyr)
+            <select id="ov-salinity">
+              <option value="">Auto (fra kart)</option>
+              <option value="fresh">Ferskvann</option>
+              <option value="brackish">Brakkvann</option>
+              <option value="salt">Saltvann</option>
             </select>
           </label>
           <label>Lufttemp (°C)

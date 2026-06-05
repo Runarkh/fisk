@@ -27,14 +27,14 @@ export function estimateWaterTemp(airTemp, month, water = 'fresh') {
   else if ([9, 10, 11].includes(month)) lag = 2;
   else lag = -1; // vinter
 
-  let est = airTemp * 0.7 + 8 * 0.3 + lag; // demping mot ~8°C "treghet"
-  if (water === 'salt') {
-    // kysten er tregere og sjelden under ~2 eller over ~18 i Norge
-    est = airTemp * 0.45 + 9 * 0.55 + lag * 0.5;
-    est = clamp(est, 2, 19);
-  } else {
-    est = clamp(est, 0.5, 26);
-  }
+  const fresh = clamp(airTemp * 0.7 + 8 * 0.3 + lag, 0.5, 26);
+  // kysten er tregere og sjelden under ~2 eller over ~18 i Norge
+  const salt = clamp(airTemp * 0.45 + 9 * 0.55 + lag * 0.5, 2, 19);
+
+  let est;
+  if (water === 'salt') est = salt;
+  else if (water === 'brackish') est = (fresh + salt) / 2; // brakkvann ligger mellom
+  else est = fresh;
   return Math.round(est * 10) / 10;
 }
 
@@ -185,19 +185,20 @@ function seasonFactor(species, month) {
 // --- dybde og fart ut fra temperatur ---
 
 function depthAdvice(species, waterTemp) {
+  const isSalt = species.salinity.includes('salt');
   let bias = species.depthBias;
   let note = '';
   if (waterTemp != null) {
     if (waterTemp < species.tempActive[0] + 2) {
       // kaldt → fisken står dypere/roligere (sjøørret/torsk kan motsatt søke grunt)
-      if (species.water === 'salt' && species.id === 'torsk') {
+      if (isSalt && species.id === 'torsk') {
         note = 'Kaldt vann: torsken kan trekke uvanlig grunt.';
       } else {
         bias = bias === 'shallow' ? 'mid' : 'deep';
         note = 'Kaldt vann presser fisken dypere og roligere.';
       }
     } else if (waterTemp > species.tempOpt[1]) {
-      bias = species.water === 'salt' ? 'deep' : (bias === 'deep' ? 'mid' : bias);
+      bias = isSalt ? 'deep' : (bias === 'deep' ? 'mid' : bias);
       note = 'Varmt vann: søk dypere/kjøligere lag og kjøligere tider på døgnet.';
     }
   }
@@ -236,7 +237,9 @@ function lureScore(lure, species, ctx) {
   const fit = species.lures[lure.id] || 0; // hvor godt agnet passer arten
   if (fit === 0) return null;
 
-  let score = fit * 100;
+  // Basis 0-70 fra hvor godt agnet passer arten, + inntil ~30 i bonus fra
+  // forholdene. Klampes til 0-100 så scoren alltid er sammenlignbar.
+  let score = fit * 70;
   const reasons = [];
 
   // lys-match
@@ -274,7 +277,7 @@ function lureScore(lure, species, ctx) {
     id: lure.id,
     name: lure.name,
     blurb: lure.blurb,
-    score: Math.round(clamp(score, 0, 130)),
+    score: Math.round(clamp(score, 0, 100)),
     reasons,
   };
 }
@@ -290,12 +293,20 @@ export function recommend(speciesId, conditions) {
   if (!species) throw new Error(`Ukjent art: ${speciesId}`);
 
   const month = conditions.month;
+
+  // Salinitet/vanntype fra valgt lokasjon (om kjent), ellers artens primære.
+  const salinity = conditions.salinity || species.salinity[0];
+  const waterType = conditions.waterType || null;
+
   const waterTemp =
     conditions.waterTemp != null
       ? conditions.waterTemp
-      : estimateWaterTemp(conditions.airTemp, month, species.water);
+      : estimateWaterTemp(conditions.airTemp, month, salinity);
   const clarity = conditions.waterClarity || 'stained';
   const light = conditions.light || { phase: 'day', label: 'Dag', nearGoldenHour: false };
+
+  // Passer arten dette vannet? (brukes til advarsel + justering)
+  const habitatMatch = !conditions.salinity || species.salinity.includes(salinity);
 
   // --- aktivitetsindeks (vektet snitt av faktorer) ---
   const factors = {
@@ -313,7 +324,11 @@ export function recommend(speciesId, conditions) {
     total += f.score * f.weight;
     wsum += f.weight;
   }
-  const activityIndex = Math.round((total / wsum) * 100);
+  let activityIndex = Math.round((total / wsum) * 100);
+
+  // Passer ikke arten dette vannet (f.eks. gjedde valgt i åpent hav) → kraftig
+  // nedjustering, men vi sperrer ikke – brukeren kan vite noe vi ikke vet.
+  if (!habitatMatch) activityIndex = Math.round(activityIndex * 0.35);
 
   let activityLabel;
   if (activityIndex >= 78) activityLabel = 'Utmerket – grip stanga!';
@@ -341,26 +356,85 @@ export function recommend(speciesId, conditions) {
     suggestedRetrieve: retrieveAdvice(waterTemp, LURE_TYPES[l.id]),
   }));
 
-  // --- tips ---
-  const tips = [];
-  tips.push(species.notes);
-  if (depth.note) tips.push(depth.note);
-  if (light.nearGoldenHour) tips.push('Du er i den gylne timen – maksimal innsats nå de neste ~60 min.');
-  if (waterTemp != null && waterTemp < 6) tips.push('Kaldt vann: senk farten dramatisk og gi lange pauser.');
-  if (conditions.windSpeed != null && conditions.windSpeed > 8) tips.push('Mye vind – fisk lo-siden og bruk tyngre agn for kontroll.');
-  if (clarity === 'murky') tips.push('Dårlig sikt: velg agn med vibrasjon/lyd og sterke signalfarger.');
+  // --- tips & triks ---
+  const tips = buildTips(species, {
+    waterTemp, clarity, light, salinity, waterType, habitatMatch, depth, conditions,
+  });
 
   return {
-    species: { id: species.id, name: species.name, nameEn: species.nameEn, water: species.water },
+    species: {
+      id: species.id, name: species.name, nameEn: species.nameEn,
+      salinity: species.salinity, waters: species.waters,
+    },
     activityIndex,
     activityLabel,
     waterTemp,
     waterTempEstimated: conditions.waterTemp == null,
     waterClarity: clarity,
+    salinity,
+    waterType,
+    habitatMatch,
     factors,
     lures,
     palette: colors,
     depth,
     tips,
   };
+}
+
+// Generelle tips & triks (egne) som dryppes inn ut fra forholdene.
+const GENERAL_TIPS = [
+  'Bytt farge før du bytter plass – ofte er det fargen, ikke fisken, som mangler.',
+  'Varier innspinningen: pauser, rykk og fartsendring trigger reaksjonshugg.',
+  'Fisk de første og siste lystimene hardest – da eter rovfisken mest.',
+  'Kryss av hvor du får hugg/følge – fisken står sjelden tilfeldig.',
+];
+
+function buildTips(species, c) {
+  const tips = [];
+  // artens egen kunnskap + 2 egne pro-tips
+  tips.push(species.notes);
+  if (species.proTips) tips.push(...species.proTips.slice(0, 2));
+
+  if (!c.habitatMatch) {
+    tips.unshift(
+      `⚠️ ${species.name} hører normalt hjemme i ${species.salinity.map(salLabel).join('/')} – ` +
+      `du har valgt ${salLabel(c.salinity)}. Sjansen er liten, men lokal kunnskap kan overraske.`
+    );
+  }
+
+  // vanntype-spesifikt
+  if (c.salinity === 'brackish') {
+    tips.push('Brakkvann: fisk rundt elvemunningen ved tidevannsskifte – næring samler seg der fersk og salt møtes.');
+  }
+  if (c.waterType === 'river' || c.waterType === 'stream') {
+    tips.push('I rennende vann: les strømmen og fisk standplassene bak steiner, i bakevjer og strømkanter.');
+  }
+  if (['sea', 'coast', 'fjord'].includes(c.waterType)) {
+    tips.push('I sjøen: følg tidevannet – inn- og utgående strøm setter fart på byttefisken og utløser bett.');
+  }
+  if (c.waterType === 'lake') {
+    tips.push('I innsjø: let etter kanter, grunner og innløp/utløp – der konsentreres både næring og fisk.');
+  }
+
+  // forholdsbaserte
+  if (c.depth.note) tips.push(c.depth.note);
+  if (c.light.nearGoldenHour) tips.push('Du er i den gylne timen – maksimal innsats de neste ~60 min.');
+  if (c.waterTemp != null && c.waterTemp < 6) tips.push('Kaldt vann: senk farten dramatisk og gi lange pauser mellom taka.');
+  if (c.waterTemp != null && c.waterTemp > 19) tips.push('Varmt vann: fisk dypere/kjøligere lag, eller de kjølige morgen- og kveldstimene.');
+  if (c.conditions.windSpeed != null && c.conditions.windSpeed > 8) tips.push('Mye vind: fisk lo-siden og bruk tyngre agn for kontroll og kastelengde.');
+  if (c.conditions.windSpeed != null && c.conditions.windSpeed >= 2 && c.conditions.windSpeed <= 6) tips.push('Lett krusning: dette er ofte de beste forholdene – fisken er modigere.');
+  if (c.clarity === 'murky') tips.push('Dårlig sikt: velg agn med vibrasjon/lyd og sterke signalfarger.');
+  if (c.clarity === 'clear') tips.push('Klart vann: gå ned i agnstørrelse, bruk naturlige farger og lengre kast.');
+  if (c.conditions.pressureTrend === 'falling') tips.push('Fallende lufttrykk: fisk nå – bettet er ofte best like før været slår om.');
+
+  // én roterende generell tips
+  tips.push(GENERAL_TIPS[(species.id.length + (c.conditions.month || 0)) % GENERAL_TIPS.length]);
+
+  // fjern duplikater og tomme
+  return [...new Set(tips.filter(Boolean))];
+}
+
+function salLabel(s) {
+  return { fresh: 'ferskvann', salt: 'saltvann', brackish: 'brakkvann' }[s] || s;
 }

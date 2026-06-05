@@ -10,8 +10,8 @@ test('listSpecies returnerer alle artene med påkrevde felter', () => {
   const list = listSpecies();
   assert.ok(list.length >= 10);
   for (const s of list) {
-    assert.ok(s.id && s.name && s.water);
-    assert.ok(['fresh', 'salt'].includes(s.water));
+    assert.ok(s.id && s.name && Array.isArray(s.salinity));
+    assert.ok(s.salinity.every((x) => ['fresh', 'salt', 'brackish'].includes(x)));
   }
 });
 

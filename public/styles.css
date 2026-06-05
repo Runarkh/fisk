@@ -78,6 +78,32 @@ button:active { transform: translateY(1px); }
 .ghost { background: transparent; border-color: var(--border); color: var(--text); }
 .ghost:hover { background: var(--panel-2); }
 
+.area-card {
+  margin-top: 0.8rem;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.7rem 0.85rem;
+  font-size: 0.9rem;
+}
+.muted { color: var(--muted); }
+.area-head { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
+.area-badge {
+  font-weight: 700;
+  border-radius: 20px;
+  padding: 0.15rem 0.7rem;
+  font-size: 0.85rem;
+}
+.sal-fresh { background: rgba(46,166,199,0.2); color: #7fd6ec; }
+.sal-salt { background: rgba(63,140,208,0.22); color: #8fb8f0; }
+.sal-brackish { background: rgba(63,208,160,0.2); color: #74e0b0; }
+.sal-unknown { background: #2a4350; color: var(--muted); }
+.area-type { color: var(--text); }
+.area-conf { color: var(--muted); font-size: 0.8rem; margin-left: auto; }
+.area-note { color: var(--accent-2); margin: 0.5rem 0 0; font-size: 0.85rem; }
+.area-nearby { margin-top: 0.5rem; color: var(--muted); font-size: 0.82rem; }
+.area-nearby .chip { display: inline-block; }
+
 .conditions { display: grid; gap: 0.6rem; }
 .placeholder { color: var(--muted); margin: 0; }
 .cond-grid {

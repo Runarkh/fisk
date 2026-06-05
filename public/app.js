@@ -5,6 +5,7 @@ const state = {
   lon: null,
   conditions: null,
   species: [],
+  area: null, // { water:{salinity,type,...}, matchingSpecies:[] }
 };
 
 // --- kart ---
@@ -24,6 +25,7 @@ function setLocation(lat, lon, zoom) {
   document.getElementById('coords').textContent =
     `${lat.toFixed(4)}, ${lon.toFixed(4)}`;
   loadConditions();
+  loadArea();
   refreshCalcButton();
 }
 
@@ -88,24 +90,96 @@ function trendLabel(t) {
   return { falling: '↓ fallende', rising: '↑ stigende', steady: '→ stabilt' }[t] || '';
 }
 
+// --- område / vanntype ---
+const SAL_ICON = { fresh: '🟦', salt: '🌊', brackish: '🟩', unknown: '❔' };
+
+async function loadArea() {
+  const card = document.getElementById('area-card');
+  card.hidden = false;
+  card.innerHTML = '<span class="spin">Sjekker hva slags vann dette er…</span>';
+  try {
+    const r = await fetch(`/api/area?lat=${state.lat}&lon=${state.lon}`);
+    const data = await r.json();
+    state.area = data;
+    renderArea(data);
+    rebuildSpeciesDropdown(data.matchingSpecies || []);
+  } catch (e) {
+    card.innerHTML = `<span class="muted">Kunne ikke avgjøre vanntype (${e.message}). Velg evt. manuelt under «Juster forhold».</span>`;
+  }
+}
+
+function renderArea(data) {
+  const card = document.getElementById('area-card');
+  const w = data.water;
+  if (!w || w.salinity === 'unknown') {
+    card.innerHTML = `<span class="muted">❔ Fant ikke en tydelig vannforekomst her${
+      data.areaError ? ` (${data.areaError})` : ''
+    }. Klikk midt i vannet, eller sett vanntype manuelt under «Juster forhold».</span>`;
+    return;
+  }
+  const nearby = (w.nearby && w.nearby.length)
+    ? `<div class="area-nearby">I området: ${w.nearby.map((n) => `<span class="chip">${n}</span>`).join(' ')}</div>`
+    : '';
+  card.innerHTML = `
+    <div class="area-head">
+      <span class="area-badge sal-${w.salinity}">${SAL_ICON[w.salinity] || ''} ${w.salinityLabel}</span>
+      <span class="area-type">${w.typeLabel}${w.name ? ` · <b>${w.name}</b>` : ''}</span>
+      <span class="area-conf">${confLabel(w.confidence)}</span>
+    </div>
+    ${w.note ? `<p class="area-note">${w.note}</p>` : ''}
+    ${nearby}`;
+}
+
+function confLabel(c) {
+  return { high: '✓ sikker', medium: '≈ ganske sikker', low: '? usikker' }[c] || '';
+}
+
 // --- arter ---
 async function loadSpecies() {
   const r = await fetch('/api/species');
   state.species = await r.json();
+  rebuildSpeciesDropdown([]);
+}
+
+function addOption(group, s) {
+  const o = document.createElement('option');
+  o.value = s.id;
+  o.textContent = s.name;
+  group.appendChild(o);
+}
+
+// Bygger nedtrekkslista. Når en vanntype er kjent, vises arter som passer
+// der øverst, og resten under «Andre arter».
+function rebuildSpeciesDropdown(matchingIds) {
   const sel = document.getElementById('species-select');
-  // grupper fersk/salt
-  const groups = { fresh: 'Ferskvann', salt: 'Saltvann' };
-  for (const key of ['fresh', 'salt']) {
-    const og = document.createElement('optgroup');
-    og.label = groups[key];
-    state.species.filter((s) => s.water === key).forEach((s) => {
-      const o = document.createElement('option');
-      o.value = s.id;
-      o.textContent = s.name;
-      og.appendChild(o);
-    });
-    sel.appendChild(og);
+  const current = sel.value;
+  sel.innerHTML = '<option value="">Velg art…</option>';
+
+  if (matchingIds && matchingIds.length) {
+    const fit = document.createElement('optgroup');
+    fit.label = `🎯 Passer her (${state.area?.water?.salinityLabel || ''})`;
+    state.species.filter((s) => matchingIds.includes(s.id)).forEach((s) => addOption(fit, s));
+    sel.appendChild(fit);
+
+    const rest = state.species.filter((s) => !matchingIds.includes(s.id));
+    if (rest.length) {
+      const og = document.createElement('optgroup');
+      og.label = 'Andre arter';
+      rest.forEach((s) => addOption(og, s));
+      sel.appendChild(og);
+    }
+  } else {
+    // grupper på artens primære salinitet (første i lista)
+    for (const [key, label] of [['fresh', 'Ferskvann'], ['salt', 'Saltvann']]) {
+      const og = document.createElement('optgroup');
+      og.label = label;
+      state.species
+        .filter((s) => s.salinity && s.salinity[0] === key)
+        .forEach((s) => addOption(og, s));
+      if (og.children.length) sel.appendChild(og);
+    }
   }
+  if (current) sel.value = current;
 }
 
 document.getElementById('species-select').addEventListener('change', (e) => {
@@ -134,11 +208,18 @@ document.getElementById('calc-btn').addEventListener('click', async () => {
   const water = parseFloat(document.getElementById('ov-water').value);
   const clarity = document.getElementById('ov-clarity').value;
 
+  // vanntype: manuell overstyring vinner, ellers fra kartoppslaget
+  const ovSal = document.getElementById('ov-salinity').value;
+  const salinity = ovSal || (state.area?.water?.salinity !== 'unknown' ? state.area?.water?.salinity : null);
+  const waterType = ovSal ? null : (state.area?.water?.type || null);
+
   const body = {
     species,
     lat: state.lat,
     lon: state.lon,
     waterClarity: clarity,
+    salinity: salinity || null,
+    waterType,
     override,
   };
   if (!Number.isNaN(water)) body.waterTemp = water;
@@ -172,10 +253,14 @@ function renderResult(data) {
       <div class="gauge-text">
         <div class="lbl">${res.activityLabel}</div>
         <div class="sub">Aktivitetsindeks for ${res.species.name.toLowerCase()} ·
-          vanntemp ${res.waterTemp ?? '?'}°C${res.waterTempEstimated ? ' (estimert)' : ''} ·
+          ${salLabel(res.salinity)} · vanntemp ${res.waterTemp ?? '?'}°C${res.waterTempEstimated ? ' (estimert)' : ''} ·
           ${clarityLabel(res.waterClarity)}</div>
       </div>
     </div>`;
+
+  const habitatWarn = res.habitatMatch === false
+    ? `<div class="warn-banner">⚠️ ${res.species.name} hører normalt ikke hjemme i ${salLabel(res.salinity)} – indeksen er kraftig nedjustert.</div>`
+    : '';
 
   const lures = res.lures.map((l) => `
     <div class="lure ${l.rank === 1 ? 'top' : ''}">
@@ -215,12 +300,15 @@ function renderResult(data) {
       ${factorRows}
     </details>`;
 
-  el.innerHTML = gauge + lures + tips + factors;
+  el.innerHTML = habitatWarn + gauge + lures + tips + factors;
   panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 function clarityLabel(c) {
   return { clear: 'klart vann', stained: 'litt farget vann', murky: 'grumsete vann' }[c] || c;
+}
+function salLabel(s) {
+  return { fresh: 'ferskvann', salt: 'saltvann', brackish: 'brakkvann', unknown: 'ukjent vann' }[s] || s;
 }
 function cap(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
 
