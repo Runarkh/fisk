@@ -10,6 +10,8 @@
 
 import express from 'express';
 import path from 'node:path';
+import os from 'node:os';
+import { execFile } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 import { lightConditions } from './src/engine/solar.js';
@@ -23,6 +25,9 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
 const PORT = process.env.PORT || 3000;
+// Bind til alle grensesnitt som standard, slik at serveren også er tilgjengelig
+// på Tailscale-IP-en (100.x) og i lokalnettet – ikke bare localhost.
+const HOST = process.env.HOST || '0.0.0.0';
 // met.no krever en identifiserende User-Agent (se deres TOS).
 const MET_UA = process.env.MET_USER_AGENT || 'Fiskeguru/1.0 github.com/runarkh/fisk';
 
@@ -220,11 +225,61 @@ app.post('/api/recommend', async (req, res) => {
 
 app.get('/api/health', (_req, res) => res.json({ ok: true }));
 
-// Ikke start server når filen importeres i tester.
-if (process.env.NODE_ENV !== 'test') {
-  app.listen(PORT, () => {
-    console.log(`🎣 Fiskeguru kjører på http://localhost:${PORT}`);
+// Finn IP-adresser å vise ved oppstart. Tailscale bruker CGNAT-området
+// 100.64.0.0/10, dvs. adresser som starter på 100.64 – 100.127.
+function isTailscaleIp(ip) {
+  const m = /^100\.(\d+)\./.exec(ip);
+  return m && +m[1] >= 64 && +m[1] <= 127;
+}
+
+function listAddresses() {
+  const out = { tailscale: [], lan: [] };
+  for (const addrs of Object.values(os.networkInterfaces())) {
+    for (const a of addrs || []) {
+      if (a.family !== 'IPv4' || a.internal) continue;
+      if (isTailscaleIp(a.address)) out.tailscale.push(a.address);
+      else out.lan.push(a.address);
+    }
+  }
+  return out;
+}
+
+// Spør Tailscale (hvis CLI finnes) etter MagicDNS-navnet, så vi kan skrive ut
+// en pen https://-adresse via «tailscale serve».
+function tailscaleDnsName() {
+  return new Promise((resolve) => {
+    execFile('tailscale', ['status', '--json'], { timeout: 2500 }, (err, stdout) => {
+      if (err) return resolve(null);
+      try {
+        const j = JSON.parse(stdout);
+        const dns = j.Self && j.Self.DNSName ? j.Self.DNSName.replace(/\.$/, '') : null;
+        resolve(dns);
+      } catch {
+        resolve(null);
+      }
+    });
   });
 }
 
-export { app, fetchWeather };
+// Ikke start server når filen importeres i tester.
+if (process.env.NODE_ENV !== 'test') {
+  app.listen(PORT, HOST, async () => {
+    const { tailscale, lan } = listAddresses();
+    console.log(`\n🎣 Fiskeguru kjører (binder ${HOST}:${PORT})\n`);
+    console.log(`   Lokalt:     http://localhost:${PORT}`);
+    for (const ip of lan) console.log(`   Lokalnett:  http://${ip}:${PORT}`);
+    for (const ip of tailscale) console.log(`   Tailscale:  http://${ip}:${PORT}   (nå fra alle enhetene dine)`);
+
+    const dns = await tailscaleDnsName();
+    if (dns) {
+      console.log(`\n   🔒 Vil du ha HTTPS (kreves for GPS-posisjon på mobil)? Kjør i et eget vindu:`);
+      console.log(`        tailscale serve ${PORT}`);
+      console.log(`      Da blir appen tilgjengelig på:  https://${dns}/`);
+    } else if (!tailscale.length) {
+      console.log(`\n   (Fant ingen Tailscale-IP ennå – sjekk at «tailscale up» er kjørt.)`);
+    }
+    console.log('');
+  });
+}
+
+export { app, fetchWeather, isTailscaleIp, listAddresses };

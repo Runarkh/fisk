@@ -56,11 +56,39 @@ npm start          # → http://localhost:3000
 
 Utvikling med auto-restart: `npm run dev`. Kjør testene: `npm test`.
 
+Serveren binder `0.0.0.0` som standard og skriver ut alle adressene den er nåbar
+på ved oppstart – inkludert lokalnett og Tailscale.
+
+### Bruk med Tailscale 🔒
+
+Vil du nå Fiskeguru fra alle enhetene dine (f.eks. mobilen ved vannet)?
+
+**Enkelt (HTTP, over Tailscale-IP):**
+```bash
+npm start
+```
+Serveren skriver ut Tailscale-adressen, f.eks. `http://100.x.y.z:3000`. Åpne den
+fra en hvilken som helst enhet på tailnettet ditt.
+
+**Best (HTTPS via Tailscale Serve):**
+```bash
+npm run tailscale
+```
+Dette setter opp `tailscale serve` og gir deg en ekte HTTPS-adresse
+(`https://<maskin>.<tailnet>.ts.net/`). HTTPS er en *sikker kontekst*, så
+**GPS-posisjon på mobil og live vær/vanntype fungerer fullt ut** – noe `file://`
+og rå HTTP ikke alltid tillater.
+
+> Krever at Tailscale er installert og `tailscale up` er kjørt på maskinen.
+> Vil du i tillegg dele utenfor tailnettet, kan du bruke `tailscale funnel ${PORT}`
+> (krever at Funnel er aktivert for tailnettet).
+
 ### Konfigurasjon
 
 | Miljøvariabel | Default | Beskrivelse |
 |---------------|---------|-------------|
 | `PORT` | `3000` | Port serveren lytter på. |
+| `HOST` | `0.0.0.0` | Nettverksgrensesnitt å binde til. Sett `127.0.0.1` for kun lokalt. |
 | `MET_USER_AGENT` | `Fiskeguru/1.0 …` | met.no krever en identifiserende User-Agent. Sett gjerne din egen med kontakt-e-post. |
 
 ## Arkitektur
