@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>🎣 Fiskeguru – beste slukvalg akkurat nå</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header>
+    <h1>🎣 Fiskeguru</h1>
+    <p class="tagline">Beste slukvalg ut fra sanntids vær- og lysforhold</p>
+  </header>
+
+  <main>
+    <section class="panel" id="step-location">
+      <h2>1. Velg lokasjon</h2>
+      <p class="hint">Klikk i kartet der du skal fiske, eller bruk din posisjon.</p>
+      <div id="map"></div>
+      <div class="loc-row">
+        <button id="geo-btn" class="ghost">📍 Bruk min posisjon</button>
+        <span id="coords" class="coords">Ingen posisjon valgt</span>
+      </div>
+    </section>
+
+    <section class="panel" id="step-conditions">
+      <h2>2. Forhold akkurat nå</h2>
+      <div id="conditions-card" class="conditions">
+        <p class="placeholder">Velg en lokasjon for å hente vær og lysforhold…</p>
+      </div>
+      <details class="adv">
+        <summary>Juster forhold manuelt (valgfritt)</summary>
+        <div class="adv-grid">
+          <label>Vanntemperatur (°C)
+            <input type="number" id="ov-water" step="0.5" placeholder="auto-estimat" />
+          </label>
+          <label>Vannklarhet
+            <select id="ov-clarity">
+              <option value="clear">Klart</option>
+              <option value="stained" selected>Litt farget</option>
+              <option value="murky">Grumsete</option>
+            </select>
+          </label>
+          <label>Lufttemp (°C)
+            <input type="number" id="ov-air" step="0.5" placeholder="auto" />
+          </label>
+          <label>Vind (m/s)
+            <input type="number" id="ov-wind" step="0.5" placeholder="auto" />
+          </label>
+        </div>
+      </details>
+    </section>
+
+    <section class="panel" id="step-species">
+      <h2>3. Ønsket fisk</h2>
+      <div class="species-row">
+        <select id="species-select">
+          <option value="">Velg art…</option>
+        </select>
+        <button id="calc-btn" class="primary" disabled>Beregn beste sluk →</button>
+      </div>
+      <p id="species-note" class="species-note"></p>
+    </section>
+
+    <section class="panel result-panel" id="step-result" hidden>
+      <h2>Anbefaling</h2>
+      <div id="result"></div>
+    </section>
+  </main>
+
+  <footer>
+    <p>Værdata fra <a href="https://met.no" target="_blank" rel="noopener">MET Norway</a> ·
+       Sol/lys beregnet lokalt · Anbefalinger er veiledende – lokalkunnskap slår alltid en kalkulator 🐟</p>
+  </footer>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+          integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <script src="app.js"></script>
+</body>
+</html>
