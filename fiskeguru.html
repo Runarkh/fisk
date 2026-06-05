@@ -1,0 +1,1875 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>🎣 Fiskeguru – beste slukvalg akkurat nå</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+  <style>
+:root {
+  --bg: #0e1b24;
+  --panel: #152733;
+  --panel-2: #1d3340;
+  --accent: #2ea6c7;
+  --accent-2: #3fd0a0;
+  --text: #e8f1f5;
+  --muted: #9bb3bf;
+  --warn: #e7a33e;
+  --good: #3fd0a0;
+  --bad: #e2615a;
+  --border: #26404e;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  background: linear-gradient(160deg, #0a141b, #0e1b24 40%, #102530);
+  color: var(--text);
+  line-height: 1.5;
+}
+
+header {
+  text-align: center;
+  padding: 1.6rem 1rem 0.4rem;
+}
+header h1 { margin: 0; font-size: 2rem; letter-spacing: 0.5px; }
+.tagline { color: var(--muted); margin: 0.3rem 0 0; }
+
+main {
+  max-width: 820px;
+  margin: 0 auto;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 1.1rem 1.2rem;
+  box-shadow: 0 6px 22px rgba(0,0,0,0.25);
+}
+.panel h2 { margin: 0 0 0.6rem; font-size: 1.15rem; }
+.hint { color: var(--muted); margin: 0 0 0.7rem; font-size: 0.9rem; }
+
+#map {
+  height: 320px;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+
+.loc-row {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  margin-top: 0.7rem;
+  flex-wrap: wrap;
+}
+.coords { color: var(--muted); font-size: 0.9rem; font-variant-numeric: tabular-nums; }
+
+button {
+  font: inherit;
+  cursor: pointer;
+  border-radius: 9px;
+  border: 1px solid transparent;
+  padding: 0.55rem 1rem;
+  transition: transform 0.05s ease, background 0.2s;
+}
+button:active { transform: translateY(1px); }
+.primary { background: var(--accent); color: #042029; font-weight: 600; }
+.primary:disabled { background: #2a4350; color: #6b8390; cursor: not-allowed; }
+.ghost { background: transparent; border-color: var(--border); color: var(--text); }
+.ghost:hover { background: var(--panel-2); }
+
+.area-card {
+  margin-top: 0.8rem;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.7rem 0.85rem;
+  font-size: 0.9rem;
+}
+.muted { color: var(--muted); }
+.area-head { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
+.area-badge {
+  font-weight: 700;
+  border-radius: 20px;
+  padding: 0.15rem 0.7rem;
+  font-size: 0.85rem;
+}
+.sal-fresh { background: rgba(46,166,199,0.2); color: #7fd6ec; }
+.sal-salt { background: rgba(63,140,208,0.22); color: #8fb8f0; }
+.sal-brackish { background: rgba(63,208,160,0.2); color: #74e0b0; }
+.sal-unknown { background: #2a4350; color: var(--muted); }
+.area-type { color: var(--text); }
+.area-conf { color: var(--muted); font-size: 0.8rem; margin-left: auto; }
+.area-note { color: var(--accent-2); margin: 0.5rem 0 0; font-size: 0.85rem; }
+.area-nearby { margin-top: 0.5rem; color: var(--muted); font-size: 0.82rem; }
+.area-nearby .chip { display: inline-block; }
+
+.conditions { display: grid; gap: 0.6rem; }
+.placeholder { color: var(--muted); margin: 0; }
+.cond-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 0.6rem;
+}
+.cond {
+  background: var(--panel-2);
+  border-radius: 9px;
+  padding: 0.55rem 0.7rem;
+}
+.cond .k { color: var(--muted); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.4px; }
+.cond .v { font-size: 1.1rem; font-weight: 600; }
+
+.adv { margin-top: 0.8rem; }
+.adv summary { cursor: pointer; color: var(--accent-2); }
+.adv-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 0.7rem;
+  margin-top: 0.7rem;
+}
+label { display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.85rem; color: var(--muted); }
+input, select {
+  font: inherit;
+  background: var(--panel-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.5rem 0.6rem;
+}
+
+.species-row { display: flex; gap: 0.7rem; flex-wrap: wrap; }
+.species-row select { flex: 1; min-width: 180px; }
+.species-note { color: var(--muted); font-size: 0.9rem; margin: 0.6rem 0 0; }
+
+/* result */
+.gauge {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+.gauge-ring {
+  --val: 0;
+  width: 96px; height: 96px;
+  border-radius: 50%;
+  background:
+    radial-gradient(closest-side, var(--panel) 70%, transparent 71%),
+    conic-gradient(var(--accent-2) calc(var(--val) * 1%), #2a4350 0);
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+  font-size: 1.4rem;
+  flex: 0 0 auto;
+}
+.gauge-text .lbl { font-size: 1.1rem; font-weight: 600; }
+.gauge-text .sub { color: var(--muted); font-size: 0.9rem; }
+
+.lure {
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  padding: 0.8rem 0.9rem;
+  margin-bottom: 0.7rem;
+}
+.lure.top { border-color: var(--accent-2); box-shadow: 0 0 0 1px var(--accent-2) inset; }
+.lure-head { display: flex; align-items: baseline; justify-content: space-between; gap: 0.5rem; }
+.lure-head .rank { color: var(--muted); font-size: 0.85rem; }
+.lure-name { font-size: 1.05rem; font-weight: 600; }
+.lure-score {
+  font-variant-numeric: tabular-nums;
+  background: var(--accent);
+  color: #042029;
+  border-radius: 20px;
+  padding: 0.1rem 0.6rem;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+.lure-blurb { color: var(--muted); font-size: 0.88rem; margin: 0.3rem 0 0.5rem; }
+.lure-specs { display: flex; flex-wrap: wrap; gap: 0.4rem 0.9rem; font-size: 0.85rem; }
+.lure-specs b { color: var(--accent-2); font-weight: 600; }
+.chips { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-top: 0.4rem; }
+.chip {
+  background: #102530;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 0.12rem 0.55rem;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.tips { margin-top: 1rem; }
+.tips h3 { font-size: 1rem; margin: 0 0 0.4rem; }
+.tips ul { margin: 0; padding-left: 1.2rem; color: var(--muted); }
+.tips li { margin-bottom: 0.3rem; }
+
+.factors { margin-top: 1rem; }
+.factors summary { cursor: pointer; color: var(--accent-2); }
+.factor-row { display: flex; align-items: center; gap: 0.6rem; margin: 0.45rem 0; font-size: 0.85rem; }
+.factor-row .fname { width: 95px; flex: 0 0 auto; color: var(--muted); }
+.bar { flex: 1; height: 8px; background: #2a4350; border-radius: 5px; overflow: hidden; }
+.bar > span { display: block; height: 100%; background: var(--accent-2); }
+.factor-reason { color: var(--muted); font-size: 0.8rem; margin: 0 0 0.3rem 95px; }
+
+.warn-banner {
+  background: rgba(231,163,62,0.15);
+  border: 1px solid var(--warn);
+  color: #f3c97e;
+  border-radius: 9px;
+  padding: 0.5rem 0.7rem;
+  font-size: 0.85rem;
+  margin-bottom: 0.8rem;
+}
+
+footer {
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.8rem;
+  padding: 1.5rem 1rem 2.5rem;
+}
+footer a { color: var(--accent-2); }
+
+.spin { animation: pulse 1s ease-in-out infinite; }
+@keyframes pulse { 0%,100%{opacity:0.5} 50%{opacity:1} }
+
+  </style>
+</head>
+<body>
+  <header>
+    <h1>🎣 Fiskeguru</h1>
+    <p class="tagline">Beste slukvalg ut fra sanntids vær- og lysforhold</p>
+  </header>
+
+  <main>
+    <section class="panel" id="step-location">
+      <h2>1. Velg lokasjon</h2>
+      <p class="hint">Klikk i kartet der du skal fiske, eller bruk din posisjon.</p>
+      <div id="map"></div>
+      <div class="loc-row">
+        <button id="geo-btn" class="ghost">📍 Bruk min posisjon</button>
+        <span id="coords" class="coords">Ingen posisjon valgt</span>
+      </div>
+      <div id="area-card" class="area-card" hidden></div>
+    </section>
+
+    <section class="panel" id="step-conditions">
+      <h2>2. Forhold akkurat nå</h2>
+      <div id="conditions-card" class="conditions">
+        <p class="placeholder">Velg en lokasjon for å hente vær og lysforhold…</p>
+      </div>
+      <details class="adv">
+        <summary>Juster forhold manuelt (valgfritt)</summary>
+        <div class="adv-grid">
+          <label>Vanntemperatur (°C)<input type="number" id="ov-water" step="0.5" placeholder="auto-estimat" /></label>
+          <label>Vannklarhet
+            <select id="ov-clarity">
+              <option value="clear">Klart</option>
+              <option value="stained" selected>Litt farget</option>
+              <option value="murky">Grumsete</option>
+            </select>
+          </label>
+          <label>Vanntype (overstyr)
+            <select id="ov-salinity">
+              <option value="">Auto (fra kart)</option>
+              <option value="fresh">Ferskvann</option>
+              <option value="brackish">Brakkvann</option>
+              <option value="salt">Saltvann</option>
+            </select>
+          </label>
+          <label>Lufttemp (°C)<input type="number" id="ov-air" step="0.5" placeholder="auto" /></label>
+          <label>Vind (m/s)<input type="number" id="ov-wind" step="0.5" placeholder="auto" /></label>
+        </div>
+      </details>
+    </section>
+
+    <section class="panel" id="step-species">
+      <h2>3. Ønsket fisk</h2>
+      <div class="species-row">
+        <select id="species-select"><option value="">Velg art…</option></select>
+        <button id="calc-btn" class="primary" disabled>Beregn beste sluk →</button>
+      </div>
+      <p id="species-note" class="species-note"></p>
+    </section>
+
+    <section class="panel result-panel" id="step-result" hidden>
+      <h2>Anbefaling</h2>
+      <div id="result"></div>
+    </section>
+  </main>
+
+  <footer>
+    <p>Værdata fra <a href="https://met.no" target="_blank" rel="noopener">MET Norway</a> ·
+       Vanntype fra OpenStreetMap · Sol/lys beregnet lokalt ·
+       Anbefalinger er veiledende – lokalkunnskap slår alltid en kalkulator 🐟</p>
+    <p class="muted" style="font-size:0.75rem">Selvstendig fil – fungerer offline for selve beregningen. Live vær/vanntype krever internett.</p>
+  </footer>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+  <script>
+//<![CDATA[
+// ===== src/engine/solar.js =====
+// solar.js
+// Beregner solas posisjon (høyde over horisonten) og soloppgang/solnedgang
+// for en gitt posisjon og tidspunkt. Basert på de velkjente astronomiske
+// formlene (samme matematikk som biblioteket SunCalc, public domain).
+//
+// Vi bruker dette til å bestemme lysforhold uten å være avhengig av et
+// eksternt API – kun lat/lon og tidspunkt trengs.
+
+const RAD = Math.PI / 180;
+const DAY_MS = 1000 * 60 * 60 * 24;
+const J1970 = 2440588;
+const J2000 = 2451545;
+const OBLIQUITY = RAD * 23.4397; // jordas aksehelling
+
+function toJulian(date) {
+  return date.valueOf() / DAY_MS - 0.5 + J1970;
+}
+function fromJulian(j) {
+  return new Date((j + 0.5 - J1970) * DAY_MS);
+}
+function toDays(date) {
+  return toJulian(date) - J2000;
+}
+
+function solarMeanAnomaly(d) {
+  return RAD * (357.5291 + 0.98560028 * d);
+}
+function eclipticLongitude(M) {
+  const C = RAD * (1.9148 * Math.sin(M) + 0.02 * Math.sin(2 * M) + 0.0003 * Math.sin(3 * M));
+  const P = RAD * 102.9372; // perihelion
+  return M + C + P + Math.PI;
+}
+function declination(L) {
+  return Math.asin(Math.sin(OBLIQUITY) * Math.sin(L));
+}
+function rightAscension(L) {
+  return Math.atan2(Math.sin(L) * Math.cos(OBLIQUITY), Math.cos(L));
+}
+function siderealTime(d, lw) {
+  return RAD * (280.16 + 360.9856235 * d) - lw;
+}
+
+/**
+ * Solas høyde (altitude) og azimut for gitt tidspunkt og posisjon.
+ * @returns {{ altitude:number, azimuth:number }} grader.
+ */
+function sunPosition(date, lat, lon) {
+  const lw = RAD * -lon;
+  const phi = RAD * lat;
+  const d = toDays(date);
+
+  const M = solarMeanAnomaly(d);
+  const L = eclipticLongitude(M);
+  const dec = declination(L);
+  const ra = rightAscension(L);
+  const H = siderealTime(d, lw) - ra;
+
+  const altitude = Math.asin(
+    Math.sin(phi) * Math.sin(dec) + Math.cos(phi) * Math.cos(dec) * Math.cos(H)
+  );
+  const azimuth = Math.atan2(
+    Math.sin(H),
+    Math.cos(H) * Math.sin(phi) - Math.tan(dec) * Math.cos(phi)
+  );
+  return {
+    altitude: altitude / RAD,
+    azimuth: (azimuth / RAD + 180) % 360,
+  };
+}
+
+// --- soloppgang / solnedgang ---
+const J0 = 0.0009;
+function julianCycle(d, lw) {
+  return Math.round(d - J0 - lw / (2 * Math.PI));
+}
+function approxTransit(Ht, lw, n) {
+  return J0 + (Ht + lw) / (2 * Math.PI) + n;
+}
+function solarTransitJ(ds, M, L) {
+  return J2000 + ds + 0.0053 * Math.sin(M) - 0.0069 * Math.sin(2 * L);
+}
+function hourAngle(h, phi, dec) {
+  return Math.acos(
+    (Math.sin(h) - Math.sin(phi) * Math.sin(dec)) / (Math.cos(phi) * Math.cos(dec))
+  );
+}
+
+/**
+ * Soloppgang, solnedgang og soltime (transit) for kalenderdagen.
+ * Returnerer null for tider som ikke inntreffer (midnattssol / mørketid).
+ */
+function sunTimes(date, lat, lon) {
+  const lw = RAD * -lon;
+  const phi = RAD * lat;
+  const d = toDays(date);
+  const n = julianCycle(d, lw);
+  const ds = approxTransit(0, lw, n);
+  const M = solarMeanAnomaly(ds);
+  const L = eclipticLongitude(M);
+  const dec = declination(L);
+  const Jnoon = solarTransitJ(ds, M, L);
+
+  const h0 = -0.833 * RAD; // standard refraksjon for sol-skive
+  const cosH = (Math.sin(h0) - Math.sin(phi) * Math.sin(dec)) / (Math.cos(phi) * Math.cos(dec));
+
+  let sunrise = null;
+  let sunset = null;
+  let polar = null;
+  if (cosH <= -1) polar = 'midnattssol'; // sola går aldri ned
+  else if (cosH >= 1) polar = 'mørketid'; // sola står aldri opp
+  else {
+    const Hangle = Math.acos(cosH);
+    const Jset = solarTransitJ(approxTransit(Hangle, lw, n), M, L);
+    const Jrise = Jnoon - (Jset - Jnoon);
+    sunrise = fromJulian(Jrise);
+    sunset = fromJulian(Jset);
+  }
+
+  return {
+    solarNoon: fromJulian(Jnoon),
+    sunrise,
+    sunset,
+    polar,
+  };
+}
+
+/**
+ * Klassifiserer lysforhold ut fra solhøyde.
+ * Soloppgang/-nedgang og skumring er gull for mange rovfisk.
+ */
+function lightConditions(date, lat, lon) {
+  const { altitude } = sunPosition(date, lat, lon);
+  const times = sunTimes(date, lat, lon);
+
+  let phase;
+  let label;
+  if (altitude > 12) {
+    phase = 'day';
+    label = 'Full dag';
+  } else if (altitude > 0) {
+    phase = 'lowsun';
+    label = 'Lavtstående sol';
+  } else if (altitude > -6) {
+    phase = 'twilight';
+    label = 'Skumring / demring';
+  } else {
+    phase = 'night';
+    label = 'Mørkt';
+  }
+
+  // Hvor nær er vi gryning/skumring (de mest aktive periodene)?
+  let nearGoldenHour = false;
+  for (const t of [times.sunrise, times.sunset]) {
+    if (t && Math.abs(t - date) < 75 * 60 * 1000) nearGoldenHour = true;
+  }
+
+  return {
+    sunAltitude: Math.round(altitude * 10) / 10,
+    phase,
+    label,
+    nearGoldenHour,
+    sunrise: times.sunrise,
+    sunset: times.sunset,
+    solarNoon: times.solarNoon,
+    polar: times.polar,
+  };
+}
+
+
+// ===== src/engine/lures.js =====
+// lures.js
+// Katalog over agntyper med egenskaper som anbefalingsmotoren bruker.
+//
+// Egenskaper:
+//  - depth:        hvilke vannlag agnet primært jobber i ('top','mid','deep','any')
+//  - bestLight:    lysforhold der typen skinner ('bright','low','any')
+//  - bestClarity:  vannklarhet ('clear','stained','murky','any')
+//  - action:       hvor mye liv/vibrasjon ('subtle','moderate','high')
+//  - coldOk:       hvor godt typen fungerer i kaldt vann (0-1, brukes til scoring)
+//  - speed:        anbefalt innspinningsfart ('slow','medium','fast','varied')
+//
+// Fargevalg avgjøres dynamisk i recommend.js ut fra lys + klarhet.
+const LURE_TYPES = {
+  spinner: {
+    id: 'spinner',
+    name: 'Spinner',
+    depth: 'mid',
+    bestLight: 'any',
+    bestClarity: 'stained',
+    action: 'high',
+    coldOk: 0.5,
+    speed: 'medium',
+    blurb: 'Roterende blad gir blink og vibrasjon – tiltrekker på sansene selv i grumsete vann.',
+  },
+  spoon: {
+    id: 'spoon',
+    name: 'Skjesluk',
+    depth: 'mid',
+    bestLight: 'bright',
+    bestClarity: 'clear',
+    action: 'moderate',
+    coldOk: 0.6,
+    speed: 'varied',
+    blurb: 'Klassisk vippende blink. Allround-sluk som kaster langt og søker av store områder.',
+  },
+  wobbler: {
+    id: 'wobbler',
+    name: 'Wobbler / sluk med dykkfinne',
+    depth: 'mid',
+    bestLight: 'any',
+    bestClarity: 'any',
+    action: 'high',
+    coldOk: 0.55,
+    speed: 'medium',
+    blurb: 'Svømmer med eget vrikk på fast dybde. Lett å fiske kontrollert langs kanter.',
+  },
+  jerkbait: {
+    id: 'jerkbait',
+    name: 'Jerkbait',
+    depth: 'mid',
+    bestLight: 'low',
+    bestClarity: 'clear',
+    action: 'high',
+    coldOk: 0.35,
+    speed: 'varied',
+    blurb: 'Rykkes i uberegnelige utfall – trigger reaksjonshugg fra rovfisk i bevegelse.',
+  },
+  softbait: {
+    id: 'softbait',
+    name: 'Jigg / softbait',
+    depth: 'deep',
+    bestLight: 'any',
+    bestClarity: 'any',
+    action: 'moderate',
+    coldOk: 0.9,
+    speed: 'slow',
+    blurb: 'Mykt gummiagn på jigghode. Fiskes sakte langs bunn – uslåelig i kaldt og passivt fiske.',
+  },
+  crankbait: {
+    id: 'crankbait',
+    name: 'Crankbait (dyptgående)',
+    depth: 'deep',
+    bestLight: 'bright',
+    bestClarity: 'stained',
+    action: 'high',
+    coldOk: 0.4,
+    speed: 'medium',
+    blurb: 'Graver seg ned mot bunn og banker mot strukturer. Dekker dypere standplasser.',
+  },
+  topwater: {
+    id: 'topwater',
+    name: 'Overflateagn (popper/walker)',
+    depth: 'top',
+    bestLight: 'low',
+    bestClarity: 'clear',
+    action: 'high',
+    coldOk: 0.1,
+    speed: 'varied',
+    blurb: 'Plasker i overflaten. Spektakulært i varmt vann ved demring/skumring og stille forhold.',
+  },
+  fly: {
+    id: 'fly',
+    name: 'Flue / nymfe',
+    depth: 'top',
+    bestLight: 'low',
+    bestClarity: 'clear',
+    action: 'subtle',
+    coldOk: 0.5,
+    speed: 'slow',
+    blurb: 'Imiterer insekter/yngel. Suverent ved klekkinger og forsiktig fisk i klart vann.',
+  },
+  pirk: {
+    id: 'pirk',
+    name: 'Pilk',
+    depth: 'deep',
+    bestLight: 'any',
+    bestClarity: 'any',
+    action: 'high',
+    coldOk: 0.8,
+    speed: 'varied',
+    blurb: 'Tung blink som pilkes vertikalt over dypet – standardvåpen for saltvann fra båt.',
+  },
+  shrimp: {
+    id: 'shrimp',
+    name: 'Reke-/makkimitasjon',
+    depth: 'deep',
+    bestLight: 'any',
+    bestClarity: 'any',
+    action: 'subtle',
+    coldOk: 0.85,
+    speed: 'slow',
+    blurb: 'Naturtro reke på krok/jigg. Tålmodig bunnfiske etter mistenksom fisk.',
+  },
+};
+
+// Farge-paletter velges ut fra lys og vannklarhet.
+const COLOR_RULES = {
+  // klart vann + mye lys → naturlige/sølv toner
+  clearBright: ['sølv', 'naturlig abbor', 'klar/transparent', 'blå-sølv'],
+  // klart vann + lavt lys → litt mer kontrast
+  clearLow: ['sølv-blå', 'sort-sølv', 'rød-hvit', 'naturlig'],
+  // grumsete/farget vann + lys → kontrast og blink
+  stainedBright: ['gull', 'kobber', 'oransje-tiger', 'chartreuse'],
+  // grumsete + lavt lys → sterke/mørke signalfarger
+  stainedLow: ['chartreuse', 'fluorescerende gul', 'sort', 'rød-svart'],
+  // veldig grumsete / mørkt → silhuett + UV/glow
+  murkyDark: ['sort (silhuett)', 'fluo gul/grønn', 'glow/UV', 'sterk oransje'],
+};
+
+
+// ===== src/engine/species.js =====
+// species.js
+// Profiler for vanlige norske fiskearter. Verdiene er destillert praktisk +
+// teoretisk fiskekunnskap, og brukes av anbefalingsmotoren til scoring.
+//
+//  - salinity:    hvilke vanntyper arten finnes i: 'fresh' | 'brackish' | 'salt'
+//  - waters:      typer vannforekomst arten typisk står i
+//                 ('lake','river','coast','fjord','sea')
+//  - tempOpt:     [min,max] vanntemp (°C) der arten er mest aktiv/eter best
+//  - tempActive:  [min,max] ytre grenser der arten i praksis hugger
+//  - lightPref:   foretrukket lys ('low' = demring/skumring/overskyet, 'bright', 'any')
+//  - depthBias:   typisk standplass ('shallow','mid','deep') – flyttes av temp i motoren
+//  - lures:       agntyper som passer, med vekt (0-1) for hvor godt de passer arten
+//  - sizeRange:   anbefalt agnvekt i gram [min,max]
+//  - season:      måneder (1-12) der fisket typisk er best
+//  - notes:       kort praktisk tips
+//  - proTips:     egne tips & triks for arten
+const SPECIES = {
+  gjedde: {
+    id: 'gjedde',
+    name: 'Gjedde',
+    nameEn: 'Northern pike',
+    salinity: ['fresh', 'brackish'],
+    waters: ['lake', 'river'],
+    tempOpt: [12, 18],
+    tempActive: [4, 24],
+    lightPref: 'low',
+    depthBias: 'shallow',
+    lures: { jerkbait: 1.0, wobbler: 0.9, spinner: 0.85, spoon: 0.8, softbait: 0.85, topwater: 0.6 },
+    sizeRange: [15, 80],
+    season: [4, 5, 6, 9, 10, 11],
+    notes: 'Standplass-jeger ved vegetasjon og kanter. Stort agn = stor gjedde. Sakte tak når vannet er kaldt.',
+    proTips: [
+      'Fisk «åttetallet» ved båten/land – gjedda følger ofte agnet helt inn før den hugger.',
+      'Stålfortom er et must; gjeddetenner kapper vanlig sene på et blunk.',
+      'Let etter vegetasjonskanter, nedfall og brå dybdeendringer – der ligger jegeren i bakhold.',
+    ],
+  },
+  abbor: {
+    id: 'abbor',
+    name: 'Abbor',
+    nameEn: 'Perch',
+    salinity: ['fresh', 'brackish'],
+    waters: ['lake', 'river'],
+    tempOpt: [12, 20],
+    tempActive: [4, 24],
+    lightPref: 'bright',
+    depthBias: 'mid',
+    lures: { softbait: 1.0, spinner: 0.85, wobbler: 0.7, spoon: 0.6, jerkbait: 0.4 },
+    sizeRange: [3, 15],
+    season: [5, 6, 7, 8, 9, 10],
+    notes: 'Stimfisk – finn én, finn flere. Liker små agn og jigging nær bunn. Aktiv i dagslys.',
+    proTips: [
+      'Finner du én stor abbor, står det ofte en hel stim – kast rett tilbake på samme sted.',
+      'Dropshot eller liten jigg pirket sakte langs bunn når abboren er passiv.',
+      'Rød/oransje detaljer imiterer skadet byttefisk og trigger hugg.',
+    ],
+  },
+  orret: {
+    id: 'orret',
+    name: 'Ørret (innsjø/elv)',
+    nameEn: 'Brown trout',
+    salinity: ['fresh'],
+    waters: ['lake', 'river'],
+    tempOpt: [9, 16],
+    tempActive: [2, 19],
+    lightPref: 'low',
+    depthBias: 'mid',
+    lures: { spinner: 0.95, spoon: 0.9, fly: 0.9, wobbler: 0.7, softbait: 0.5 },
+    sizeRange: [3, 18],
+    season: [5, 6, 7, 8, 9],
+    notes: 'Sky i klart vann – fisk fint og naturlig. Insektsklekkinger i demring gir hektisk overflatefiske.',
+    proTips: [
+      'I elv: kast oppstrøms og la slukket svinge naturlig inn mot standplassene bak steiner.',
+      'Klart fjellvann krever lange kast, tynn sene og naturlige farger.',
+      'Ser du vak ved insektsklekking? Bytt til flue eller bombarda med flue bak.',
+    ],
+  },
+  roye: {
+    id: 'roye',
+    name: 'Røye',
+    nameEn: 'Arctic char',
+    salinity: ['fresh'],
+    waters: ['lake', 'river'],
+    tempOpt: [4, 12],
+    tempActive: [1, 16],
+    lightPref: 'low',
+    depthBias: 'deep',
+    lures: { spoon: 0.95, spinner: 0.85, fly: 0.8, softbait: 0.6 },
+    sizeRange: [3, 20],
+    season: [6, 7, 8, 9],
+    notes: 'Kaldtvannsfisk som ofte står dypt. Små, blanke skjesluk og rød/rosa innslag er en klassiker.',
+    proTips: [
+      'Røya står ofte i termoklinen – tell agnet ned og kartlegg dybden den eter på.',
+      'Rosa/oransje innslag på blanke skjer utløser hugg.',
+      'Isfiske: små pilkagn agnet med maggot/mark, og let opp riktig dyp.',
+    ],
+  },
+  harr: {
+    id: 'harr',
+    name: 'Harr',
+    nameEn: 'Grayling',
+    salinity: ['fresh'],
+    waters: ['river', 'lake'],
+    tempOpt: [8, 16],
+    tempActive: [3, 18],
+    lightPref: 'low',
+    depthBias: 'mid',
+    lures: { fly: 1.0, spinner: 0.7, softbait: 0.4 },
+    sizeRange: [2, 8],
+    season: [6, 7, 8, 9],
+    notes: 'Insektseter i strømmende vann. Tørrflue/nymfe over standplassene er førstevalget.',
+    proTips: [
+      'Harren vaker – legg en tørrflue presist over ringene ved solnedgang.',
+      'Stå lavt og kast oppstrøms; harren er sky og rygger for skygger.',
+      'Vaker den ikke, driv små nymfer langs bunn gjennom standplassen.',
+    ],
+  },
+  laks: {
+    id: 'laks',
+    name: 'Laks',
+    nameEn: 'Atlantic salmon',
+    salinity: ['fresh', 'brackish'],
+    waters: ['river'],
+    tempOpt: [8, 14],
+    tempActive: [4, 18],
+    lightPref: 'low',
+    depthBias: 'mid',
+    lures: { fly: 0.95, spoon: 0.9, wobbler: 0.8, spinner: 0.8 },
+    sizeRange: [10, 35],
+    season: [6, 7, 8],
+    notes: 'Hugger reaksjon, ikke sult, i elva. Tidlig morgen og kveld med litt vannføring er beste vindu.',
+    proTips: [
+      'Fisk fluen/slukket på «swing» i jevn fart tvers over hølen.',
+      'Litt farge og stigende/fallende vannføring etter regn vekker fisken.',
+      'Veksle størrelse og farge systematisk til du finner dagens trigger.',
+    ],
+  },
+  sjoorret: {
+    id: 'sjoorret',
+    name: 'Sjøørret',
+    nameEn: 'Sea trout',
+    salinity: ['salt', 'brackish', 'fresh'],
+    waters: ['coast', 'fjord', 'river'],
+    tempOpt: [6, 14],
+    tempActive: [2, 17],
+    lightPref: 'low',
+    depthBias: 'shallow',
+    lures: { spoon: 0.95, fly: 0.9, wobbler: 0.85, spinner: 0.75 },
+    sizeRange: [10, 28],
+    season: [3, 4, 5, 6, 9, 10, 11],
+    notes: 'Kystjeger på grunna. Demring, skumring og litt sjø gir best sjanse. Vinterstøinger tar sakte agn.',
+    proTips: [
+      'Vandre og dekk mye vann – sjøørret er en jeger på farten, ikke en standplassfisk.',
+      'Fisk grunningene rundt fjære/flo og i lysskiftet morgen og kveld.',
+      'Vinterstøinger står dypt og treigt – senk farten dramatisk og fisk sakte.',
+    ],
+  },
+  torsk: {
+    id: 'torsk',
+    name: 'Torsk',
+    nameEn: 'Atlantic cod',
+    salinity: ['salt', 'brackish'],
+    waters: ['fjord', 'sea', 'coast'],
+    tempOpt: [4, 9],
+    tempActive: [1, 14],
+    lightPref: 'any',
+    depthBias: 'deep',
+    lures: { pirk: 1.0, softbait: 0.9, shrimp: 0.7, spoon: 0.5 },
+    sizeRange: [60, 300],
+    season: [1, 2, 3, 4, 11, 12],
+    notes: 'Bunnfisk over rev og kanter. Pilk vertikalt og la agnet banke bunn. Kommer grunnere i kaldt vann.',
+    proTips: [
+      'La pilken banke bunn – hugget kommer som regel når agnet synker.',
+      'Driv over rev, egg og bratte kanter, ikke over flat, død bunn.',
+      'Kaldt vann om vinteren: torsken trekker grunt, prøv 5–15 m fra land.',
+    ],
+  },
+  sei: {
+    id: 'sei',
+    name: 'Sei',
+    nameEn: 'Saithe',
+    salinity: ['salt'],
+    waters: ['fjord', 'sea', 'coast'],
+    tempOpt: [6, 12],
+    tempActive: [3, 16],
+    lightPref: 'any',
+    depthBias: 'mid',
+    lures: { pirk: 0.95, softbait: 0.85, spoon: 0.7, shrimp: 0.5 },
+    sizeRange: [40, 200],
+    season: [5, 6, 7, 8, 9, 10],
+    notes: 'Pelagisk og rasende kampsterk. Står ofte i frie vannmasser – tell agnet ned til riktig sjikt.',
+    proTips: [
+      'Finn riktig dybde: seien står i «sjikt» – tell agnet ned og finn etesonen.',
+      'Rask, jevn innspinning – seien elsker fart og jakter aktivt.',
+      'Følg måkene og overflateaktivitet for å lokalisere stimene.',
+    ],
+  },
+  makrell: {
+    id: 'makrell',
+    name: 'Makrell',
+    nameEn: 'Mackerel',
+    salinity: ['salt'],
+    waters: ['fjord', 'sea', 'coast'],
+    tempOpt: [12, 18],
+    tempActive: [9, 22],
+    lightPref: 'bright',
+    depthBias: 'shallow',
+    lures: { spoon: 0.9, pirk: 0.85, spinner: 0.7, softbait: 0.6 },
+    sizeRange: [10, 60],
+    season: [6, 7, 8, 9],
+    notes: 'Sommergjest i stim nær overflaten. Rask innspinning av blanke agn – let etter måkene og overflateaktivitet.',
+    proTips: [
+      'Stimene følger varmt overflatevann – let i sol og stille, gjerne midt på dagen.',
+      'Makkstang/forfang med flere fluer gir flere fisk per kast når stimen står tett.',
+      'Sveiv raskt og høyt i vannet – makrellen jakter oppe.',
+    ],
+  },
+  lyr: {
+    id: 'lyr',
+    name: 'Lyr',
+    nameEn: 'Pollack',
+    salinity: ['salt'],
+    waters: ['fjord', 'coast', 'sea'],
+    tempOpt: [8, 14],
+    tempActive: [4, 18],
+    lightPref: 'low',
+    depthBias: 'mid',
+    lures: { softbait: 0.95, pirk: 0.8, wobbler: 0.7, spoon: 0.6 },
+    sizeRange: [30, 150],
+    season: [5, 6, 7, 8, 9, 10],
+    notes: 'Står ved tareskog og rev. Mykt agn fisket langs strukturen i demring er dødelig.',
+    proTips: [
+      'Fisk tett inntil tareskog og rev, særlig i skumringen.',
+      'Mykt agn «pumpet» sakte opp fra bunn trigger eksplosive hugg.',
+      'Lyren tar ofte idet agnet stopper og synker – vær klar på synken.',
+    ],
+  },
+  hvitting: {
+    id: 'hvitting',
+    name: 'Hvitting',
+    nameEn: 'Whiting',
+    salinity: ['salt'],
+    waters: ['fjord', 'sea', 'coast'],
+    tempOpt: [6, 12],
+    tempActive: [2, 15],
+    lightPref: 'low',
+    depthBias: 'deep',
+    lures: { shrimp: 0.9, softbait: 0.8, pirk: 0.6 },
+    sizeRange: [20, 80],
+    season: [9, 10, 11, 12, 1],
+    notes: 'Bunnnær åtseleter, mest aktiv i mørke timer. Små naturlige agn nær bunn.',
+    proTips: [
+      'Bunnfiske i mørket – hvittingen eter mest når lyset er borte.',
+      'Reke eller mark på paternoster like over bunn er drepende.',
+      'Best på høst/vinter når den samler seg på dypet.',
+    ],
+  },
+};
+function listSpecies() {
+  return Object.values(SPECIES).map((s) => ({
+    id: s.id,
+    name: s.name,
+    nameEn: s.nameEn,
+    salinity: s.salinity,
+    waters: s.waters,
+    season: s.season,
+    notes: s.notes,
+  }));
+}
+
+/**
+ * Arter som realistisk kan fiskes i en gitt salinitet (og evt. vanntype).
+ * @param {'fresh'|'salt'|'brackish'} salinity
+ * @param {string} [waterType] f.eks. 'lake','river','fjord','sea','coast'
+ */
+function speciesForWater(salinity, waterType) {
+  return Object.values(SPECIES).filter((s) => {
+    if (salinity && !s.salinity.includes(salinity)) return false;
+    if (waterType && s.waters && !s.waters.includes(waterType)) {
+      // tillat hav/fjord/kyst om hverandre – de overlapper i praksis
+      const seaGroup = ['sea', 'fjord', 'coast'];
+      if (seaGroup.includes(waterType) && s.waters.some((w) => seaGroup.includes(w))) return true;
+      return false;
+    }
+    return true;
+  }).map((s) => s.id);
+}
+
+
+// ===== src/engine/water.js =====
+// water.js
+// Gjenkjenner hva slags vann brukeren har trykket på, ut fra OpenStreetMap-data
+// (Overpass). Skiller mellom:
+//   - innsjø (lake)        → ferskvann
+//   - elv/bekk (river)     → ferskvann
+//   - fjord/kystsjø        → saltvann
+//   - åpent hav (sea)      → saltvann
+//   - brakkvann            → elvemunning/poll der ferskvann møter sjø
+//
+// Klassifiseringen er ren og testbar: `classifyArea` tar en liste OSM-elementer
+// og returnerer en vurdering. Nettverkskallet ligger i server.js.
+
+const LAKE_WATERS = ['lake', 'pond', 'reservoir', 'oxbow', 'basin', 'reflecting_pool'];
+const RIVER_WATERS = ['river', 'stream', 'canal', 'stream_pool'];
+const SALT_NAME_RE = /fjord|fjorden|sund|sundet|pollen|våg|vågen|vika|havet|sjøen|bukt|kilen|str?aumen|leia/i;
+// Bevisst med ordgrenser så «Oslofjorden» o.l. ikke matcher på «os».
+const ESTUARY_RE = /munning|elveos|estuar|\bdelta\b|\bos(en)?\b/i;
+
+/**
+ * Bygger én Overpass-spørring som henter både omsluttende vannpolygon (is_in)
+ * og nærliggende lineære forekomster (kystlinje, elver, bukter, hav).
+ */
+function buildOverpassQuery(lat, lon) {
+  return `[out:json][timeout:25];
+is_in(${lat},${lon})->.a;
+(
+  area.a["natural"="water"];
+  area.a["place"~"sea|ocean|strait|bay"];
+  area.a["natural"~"bay|strait"];
+);
+out tags;
+(
+  way(around:1500,${lat},${lon})["natural"="coastline"];
+  way(around:700,${lat},${lon})["waterway"~"^(river|tidal_channel|canal)$"];
+  way(around:400,${lat},${lon})["waterway"="stream"];
+  way(around:900,${lat},${lon})["natural"="water"]["name"];
+  rel(around:1500,${lat},${lon})["natural"~"bay|strait"]["name"];
+  rel(around:4000,${lat},${lon})["place"~"sea|ocean"]["name"];
+);
+out tags 60;`;
+}
+
+const has = (el, key, re) => el.tags && el.tags[key] && re.test(el.tags[key]);
+
+/**
+ * Klassifiserer ut fra OSM-elementer (blanding av 'area' fra is_in og
+ * 'way'/'relation' fra around-spørringen).
+ * @returns {{
+ *   salinity:'fresh'|'salt'|'brackish'|'unknown',
+ *   type:string, typeLabel:string, salinityLabel:string,
+ *   name:string|null, nearby:string[], confidence:'high'|'medium'|'low',
+ *   note:string
+ * }}
+ */
+function classifyArea(elements = []) {
+  const areas = elements.filter((e) => e.type === 'area');
+  const nearby = elements.filter((e) => e.type === 'way' || e.type === 'relation');
+
+  // Omsluttende forekomster (is_in)
+  const enclosingWater = areas.find((a) => has(a, 'natural', /^water$/));
+  const enclosingSea = areas.find(
+    (a) => has(a, 'place', /sea|ocean|strait|bay/) || has(a, 'natural', /bay|strait/)
+  );
+
+  // Nærliggende trekk
+  const hasCoastline = nearby.some((e) => has(e, 'natural', /coastline/));
+  const nearbyRiver = nearby.find((e) => has(e, 'waterway', /river|tidal_channel|canal/));
+  const nearbyStream = nearby.find((e) => has(e, 'waterway', /stream/));
+  const nearbyBay = nearby.find((e) => has(e, 'natural', /bay|strait/));
+  const nearbySea = nearby.find((e) => has(e, 'place', /sea|ocean/));
+  const nearbyNamedWater = nearby.find((e) => has(e, 'natural', /^water$/) && e.tags.name);
+
+  // Samle navn på det som finnes i området
+  const nearbyNames = [];
+  for (const e of [...areas, ...nearby]) {
+    const n = e.tags && e.tags.name;
+    if (n && !nearbyNames.includes(n)) nearbyNames.push(n);
+  }
+
+  let type = 'unknown';
+  let salinity = 'unknown';
+  let confidence = 'low';
+  let name = null;
+  let note = '';
+
+  if (enclosingWater) {
+    name = enclosingWater.tags.name || null;
+    const w = (enclosingWater.tags.water || '').toLowerCase();
+    const saltTag = enclosingWater.tags.salt; // 'yes' | 'no' | undefined
+    confidence = 'high';
+
+    if (saltTag === 'yes' || w === 'lagoon') {
+      type = w === 'lagoon' ? 'lagoon' : 'fjord';
+      salinity = 'salt';
+    } else if (RIVER_WATERS.includes(w)) {
+      type = w === 'stream' ? 'stream' : 'river';
+      salinity = 'fresh';
+    } else if (LAKE_WATERS.includes(w)) {
+      type = 'lake';
+      salinity = 'fresh';
+    } else {
+      // Generisk natural=water uten undertype – avgjør med kontekst.
+      const looksSalt =
+        saltTag !== 'no' &&
+        (hasCoastline || nearbySea || nearbyBay || (name && SALT_NAME_RE.test(name)));
+      if (looksSalt) {
+        type = 'fjord';
+        salinity = 'salt';
+      } else {
+        type = 'lake';
+        salinity = 'fresh';
+      }
+    }
+  } else if (enclosingSea) {
+    name = enclosingSea.tags.name || null;
+    type = has(enclosingSea, 'place', /sea|ocean/) ? 'sea' : 'fjord';
+    salinity = 'salt';
+    confidence = 'high';
+  } else if (hasCoastline || nearbySea || nearbyBay) {
+    // Ingen omsluttende polygon, men kyst/hav i nærheten → saltvann.
+    name = (nearbySea && nearbySea.tags.name) || (nearbyBay && nearbyBay.tags.name) ||
+      (nearbyNamedWater && nearbyNamedWater.tags.name) || null;
+    type = nearbySea ? 'sea' : hasCoastline ? 'coast' : 'fjord';
+    salinity = 'salt';
+    confidence = 'medium';
+  } else if (nearbyRiver) {
+    name = nearbyRiver.tags.name || null;
+    type = 'river';
+    salinity = 'fresh';
+    confidence = 'medium';
+  } else if (nearbyStream) {
+    name = nearbyStream.tags.name || null;
+    type = 'stream';
+    salinity = 'fresh';
+    confidence = 'medium';
+  } else if (nearbyNamedWater) {
+    name = nearbyNamedWater.tags.name || null;
+    type = 'lake';
+    salinity = 'fresh';
+    confidence = 'low';
+  }
+
+  // --- Brakkvanns-deteksjon (elvemunning/estuar) ---
+  // Saltvann med en betydelig elv rett ved → brakk elvemunning.
+  if (salinity === 'salt' && (nearbyRiver || (name && ESTUARY_RE.test(name)))) {
+    salinity = 'brackish';
+    type = 'brackish';
+    note = 'Elv møter sjø her – brakkvann, der både fersk- og saltvannsarter kan opptre.';
+  } else if (salinity === 'fresh' && (type === 'river' || type === 'stream') &&
+             (hasCoastline || nearbySea)) {
+    // Nedre elveløp helt ute ved sjøen → tidevannspåvirket/brakt.
+    salinity = 'brackish';
+    type = 'brackish';
+    note = 'Nedre elveløp ut mot sjøen – ofte tidevannspåvirket og brakt.';
+  }
+
+  return {
+    salinity,
+    type,
+    typeLabel: TYPE_LABELS[type] || 'Ukjent vannforekomst',
+    salinityLabel: SALINITY_LABELS[salinity] || 'Ukjent',
+    name,
+    nearby: nearbyNames.slice(0, 6),
+    confidence,
+    note,
+  };
+}
+
+const TYPE_LABELS = {
+  lake: 'Innsjø / vann',
+  river: 'Elv',
+  stream: 'Bekk',
+  fjord: 'Fjord / kystsjø',
+  coast: 'Kystsjø',
+  sea: 'Åpent hav',
+  lagoon: 'Lagune / poll',
+  brackish: 'Brakkvann (elvemunning)',
+  unknown: 'Ukjent vannforekomst',
+};
+
+const SALINITY_LABELS = {
+  fresh: 'Ferskvann',
+  salt: 'Saltvann',
+  brackish: 'Brakkvann',
+  unknown: 'Ukjent',
+};
+
+
+// ===== src/engine/recommend.js =====
+// recommend.js
+// Anbefalingsmotoren. Tar en fiskeart + rådende forhold og produserer:
+//  - en aktivitetsindeks (0-100) for hvor gode forholdene er akkurat nå
+//  - en rangert liste over agn med størrelse, farge, dybde, fart og begrunnelse
+//  - praktiske tips
+//
+// All logikk er regelbasert og forklarbar – ingen "magi". Hver delscore
+// kommer med en menneskelig lesbar begrunnelse.
+
+const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+
+/**
+ * Grovt estimat av vanntemperatur hvis den ikke er målt.
+ * Vann henger etter lufttemperatur og demper svingninger – om våren er
+ * vannet kaldere enn lufta, om høsten varmere. Saltvann er mer stabilt.
+ */
+function estimateWaterTemp(airTemp, month, water = 'fresh') {
+  if (airTemp == null) return null;
+  // sesongforskyvning: vår (3-5) trekker ned, høst (9-11) trekker opp
+  let lag = 0;
+  if ([3, 4, 5].includes(month)) lag = -3;
+  else if ([6, 7].includes(month)) lag = -1.5;
+  else if ([8].includes(month)) lag = 0;
+  else if ([9, 10, 11].includes(month)) lag = 2;
+  else lag = -1; // vinter
+
+  const fresh = clamp(airTemp * 0.7 + 8 * 0.3 + lag, 0.5, 26);
+  // kysten er tregere og sjelden under ~2 eller over ~18 i Norge
+  const salt = clamp(airTemp * 0.45 + 9 * 0.55 + lag * 0.5, 2, 19);
+
+  let est;
+  if (water === 'salt') est = salt;
+  else if (water === 'brackish') est = (fresh + salt) / 2; // brakkvann ligger mellom
+  else est = fresh;
+  return Math.round(est * 10) / 10;
+}
+
+// --- delfaktorer for aktivitetsindeks ---
+
+function tempFactor(species, waterTemp) {
+  if (waterTemp == null) return { score: 0.6, reason: 'Vanntemp ukjent – antar middels aktivitet.' };
+  const [lo, hi] = species.tempOpt;
+  const [amin, amax] = species.tempActive;
+  let score;
+  let reason;
+  if (waterTemp >= lo && waterTemp <= hi) {
+    score = 1;
+    reason = `Vanntemp ${waterTemp}°C er midt i ${species.name.toLowerCase()}ens beste vindu (${lo}-${hi}°C).`;
+  } else if (waterTemp < amin || waterTemp > amax) {
+    score = 0.15;
+    reason = `Vanntemp ${waterTemp}°C er utenfor aktivt område (${amin}-${amax}°C) – regn med treg fisk.`;
+  } else {
+    // mellom ytre grense og optimum: lineær avtrapping
+    const dist = waterTemp < lo ? lo - waterTemp : waterTemp - hi;
+    const span = waterTemp < lo ? lo - amin : amax - hi;
+    score = clamp(1 - (dist / Math.max(span, 0.1)) * 0.7, 0.3, 0.95);
+    reason = `Vanntemp ${waterTemp}°C er litt ${waterTemp < lo ? 'kjølig' : 'varm'} – aktivitet litt under topp.`;
+  }
+  return { score, reason };
+}
+
+function lightFactor(species, light) {
+  const pref = species.lightPref;
+  let score = 0.6;
+  let reason;
+  if (light.nearGoldenHour) {
+    score = 1;
+    reason = 'Gylden time (gryning/skumring) – rovfiskens beste matvindu.';
+  } else if (pref === 'low') {
+    if (light.phase === 'twilight' || light.phase === 'lowsun') {
+      score = 0.95;
+      reason = `${light.label} passer ${species.name.toLowerCase()} som liker dempet lys.`;
+    } else if (light.phase === 'night') {
+      score = 0.7;
+      reason = 'Mørkt – noen arter eter i mørket, men sikten reduseres.';
+    } else {
+      score = 0.5;
+      reason = `${light.label}: skarpt lys gjør ${species.name.toLowerCase()} mer forsiktig.`;
+    }
+  } else if (pref === 'bright') {
+    if (light.phase === 'day' || light.phase === 'lowsun') {
+      score = 0.95;
+      reason = `${light.label} passer ${species.name.toLowerCase()} som jakter på syn i dagslys.`;
+    } else if (light.phase === 'night') {
+      score = 0.35;
+      reason = 'Mørkt – synsjegeren ser dårlig, aktiviteten faller.';
+    } else {
+      score = 0.7;
+      reason = `${light.label}: brukbart, men dagsfisken liker mer lys.`;
+    }
+  } else {
+    score = 0.8;
+    reason = `${light.label}: arten er fleksibel på lys.`;
+  }
+  return { score, reason };
+}
+
+function cloudFactor(species, cloudCover) {
+  if (cloudCover == null) return { score: 0.7, reason: '' };
+  // Lett til moderat skydekke jevner ut lyset og roer mistenksom fisk –
+  // ofte bedre enn skyfri sol, særlig for lyssky arter.
+  let score;
+  let reason;
+  if (cloudCover >= 30 && cloudCover <= 85) {
+    score = 0.95;
+    reason = `Overskyet (${Math.round(cloudCover)}%) demper lyset – fisken tør lengre ut og opp.`;
+  } else if (cloudCover < 30) {
+    score = species.lightPref === 'bright' ? 0.85 : 0.6;
+    reason = `Klart vær (${Math.round(cloudCover)}% skyer) gir skarpt lys – fisk dypt eller i kantene.`;
+  } else {
+    score = 0.8;
+    reason = `Tett skydekke (${Math.round(cloudCover)}%).`;
+  }
+  return { score, reason };
+}
+
+function pressureFactor(pressure, trend) {
+  // Fallende trykk før et lavtrykk trigger ofte eting; høyt stabilt trykk
+  // etter en front gir gjerne tregere fisk.
+  let score = 0.7;
+  let reason = '';
+  if (trend === 'falling') {
+    score = 0.95;
+    reason = 'Fallende lufttrykk – klassisk hugge-vær før været slår om.';
+  } else if (trend === 'rising') {
+    score = 0.55;
+    reason = 'Stigende trykk etter front – fisken er ofte treg et døgn.';
+  } else if (trend === 'steady') {
+    score = 0.8;
+    reason = 'Stabilt lufttrykk – forutsigbare forhold.';
+  }
+  if (pressure != null && pressure < 1000) {
+    reason += ` Lavt trykk (${Math.round(pressure)} hPa).`;
+  }
+  return { score, reason };
+}
+
+function windFactor(windSpeed) {
+  if (windSpeed == null) return { score: 0.7, reason: '' };
+  // Litt krusning skjuler fiskeren og setter byttedyr i bevegelse; for mye
+  // vind gjør presentasjon og sikt vanskelig.
+  let score;
+  let reason;
+  if (windSpeed >= 2 && windSpeed <= 7) {
+    score = 0.95;
+    reason = `Lett bris (${windSpeed} m/s) krusker overflaten – skjuler deg og aktiverer byttefisk.`;
+  } else if (windSpeed < 2) {
+    score = 0.65;
+    reason = `Nesten vindstille (${windSpeed} m/s) – speilblankt vann gjør fisken sky.`;
+  } else if (windSpeed <= 11) {
+    score = 0.6;
+    reason = `Frisk vind (${windSpeed} m/s) – fisk le-sider og bruk tyngre agn.`;
+  } else {
+    score = 0.35;
+    reason = `Mye vind (${windSpeed} m/s) – krevende forhold, søk ly.`;
+  }
+  return { score, reason };
+}
+
+function precipFactor(precip) {
+  if (precip == null) return { score: 0.75, reason: '' };
+  if (precip > 0 && precip < 3) {
+    return { score: 0.9, reason: `Lett nedbør (${precip} mm) – ofte godt bett, demper lys og overflate.` };
+  }
+  if (precip >= 3) {
+    return { score: 0.6, reason: `Kraftig nedbør (${precip} mm) – kan grumse vannet og senke sikten.` };
+  }
+  return { score: 0.8, reason: '' };
+}
+
+function seasonFactor(species, month) {
+  if (!month) return { score: 0.8, reason: '' };
+  if (species.season.includes(month)) {
+    return { score: 1, reason: 'Inne i artens beste sesong.' };
+  }
+  // nabo-måned regnes som skuldersesong
+  const near = species.season.some((m) => Math.abs(m - month) <= 1 || Math.abs(m - month) === 11);
+  if (near) return { score: 0.75, reason: 'Skuldersesong – fiske mulig, men ikke toppen.' };
+  return { score: 0.45, reason: 'Utenom hovedsesong for arten.' };
+}
+
+// --- dybde og fart ut fra temperatur ---
+
+function depthAdvice(species, waterTemp) {
+  const isSalt = species.salinity.includes('salt');
+  let bias = species.depthBias;
+  let note = '';
+  if (waterTemp != null) {
+    if (waterTemp < species.tempActive[0] + 2) {
+      // kaldt → fisken står dypere/roligere (sjøørret/torsk kan motsatt søke grunt)
+      if (isSalt && species.id === 'torsk') {
+        note = 'Kaldt vann: torsken kan trekke uvanlig grunt.';
+      } else {
+        bias = bias === 'shallow' ? 'mid' : 'deep';
+        note = 'Kaldt vann presser fisken dypere og roligere.';
+      }
+    } else if (waterTemp > species.tempOpt[1]) {
+      bias = isSalt ? 'deep' : (bias === 'deep' ? 'mid' : bias);
+      note = 'Varmt vann: søk dypere/kjøligere lag og kjøligere tider på døgnet.';
+    }
+  }
+  const label = { shallow: 'grunt (0-2 m)', mid: 'mellomdypt (2-5 m)', deep: 'dypt (5 m+)' }[bias];
+  return { bias, label, note };
+}
+
+function retrieveAdvice(waterTemp, lure) {
+  // Kaldt vann → sakte; varmt → kjappere reaksjonsfiske.
+  let base = lure.speed;
+  if (waterTemp != null) {
+    if (waterTemp < 8) base = 'slow';
+    else if (waterTemp > 17) base = lure.speed === 'slow' ? 'medium' : 'fast';
+  }
+  return { slow: 'sakte', medium: 'moderat', fast: 'rask', varied: 'variert' }[base] || base;
+}
+
+// --- farge ut fra lys + klarhet ---
+
+function pickColors(light, clarity) {
+  const bright = light.phase === 'day' || light.phase === 'lowsun';
+  if (clarity === 'clear') {
+    return bright ? COLOR_RULES.clearBright : COLOR_RULES.clearLow;
+  }
+  if (clarity === 'murky') {
+    return bright ? COLOR_RULES.stainedLow : COLOR_RULES.murkyDark;
+  }
+  // stained (default)
+  return bright ? COLOR_RULES.stainedBright : COLOR_RULES.stainedLow;
+}
+
+// --- agn-scoring ---
+
+function lureScore(lure, species, ctx) {
+  const { light, clarity, waterTemp } = ctx;
+  const fit = species.lures[lure.id] || 0; // hvor godt agnet passer arten
+  if (fit === 0) return null;
+
+  // Basis 0-70 fra hvor godt agnet passer arten, + inntil ~30 i bonus fra
+  // forholdene. Klampes til 0-100 så scoren alltid er sammenlignbar.
+  let score = fit * 70;
+  const reasons = [];
+
+  // lys-match
+  if (lure.bestLight !== 'any') {
+    const lowNow = light.phase === 'twilight' || light.phase === 'night' || light.nearGoldenHour;
+    const match = (lure.bestLight === 'low' && lowNow) || (lure.bestLight === 'bright' && !lowNow);
+    score += match ? 8 : -8;
+    if (match) reasons.push(`passer ${lure.bestLight === 'low' ? 'dempet lys' : 'godt lys'} nå`);
+  }
+
+  // klarhet-match
+  if (lure.bestClarity !== 'any') {
+    const match = lure.bestClarity === clarity;
+    score += match ? 8 : -5;
+    if (match) reasons.push(`treffer vannklarheten (${clarity === 'clear' ? 'klart' : clarity === 'murky' ? 'grumsete' : 'farget'})`);
+  }
+  // grumsete vann favoriserer kraftig action/vibrasjon
+  if (clarity === 'murky') {
+    if (lure.action === 'high') { score += 10; reasons.push('kraftig vibrasjon merkes i dårlig sikt'); }
+    if (lure.action === 'subtle') score -= 8;
+  }
+
+  // temperatur → action/agn-type
+  if (waterTemp != null) {
+    if (waterTemp < 8) {
+      score += (lure.coldOk - 0.5) * 30; // belønn kaldtvanns-agn
+      if (lure.coldOk >= 0.8) reasons.push('effektivt i kaldt vann fisket sakte');
+    } else if (waterTemp > 16 && lure.depth === 'top') {
+      score += 10;
+      reasons.push('varmt vann gir sjanse for overflatehugg');
+    }
+  }
+
+  return {
+    id: lure.id,
+    name: lure.name,
+    blurb: lure.blurb,
+    score: Math.round(clamp(score, 0, 100)),
+    reasons,
+  };
+}
+
+/**
+ * Hovedfunksjon.
+ * @param {string} speciesId
+ * @param {object} conditions – { airTemp, waterTemp, cloudCover, windSpeed,
+ *        pressure, pressureTrend, precip, month, light:{phase,label,nearGoldenHour,...} }
+ */
+function recommend(speciesId, conditions) {
+  const species = SPECIES[speciesId];
+  if (!species) throw new Error(`Ukjent art: ${speciesId}`);
+
+  const month = conditions.month;
+
+  // Salinitet/vanntype fra valgt lokasjon (om kjent), ellers artens primære.
+  const salinity = conditions.salinity || species.salinity[0];
+  const waterType = conditions.waterType || null;
+
+  const waterTemp =
+    conditions.waterTemp != null
+      ? conditions.waterTemp
+      : estimateWaterTemp(conditions.airTemp, month, salinity);
+  const clarity = conditions.waterClarity || 'stained';
+  const light = conditions.light || { phase: 'day', label: 'Dag', nearGoldenHour: false };
+
+  // Passer arten dette vannet? (brukes til advarsel + justering)
+  const habitatMatch = !conditions.salinity || species.salinity.includes(salinity);
+
+  // --- aktivitetsindeks (vektet snitt av faktorer) ---
+  const factors = {
+    temperatur: { ...tempFactor(species, waterTemp), weight: 2.5 },
+    lys: { ...lightFactor(species, light), weight: 2.0 },
+    skydekke: { ...cloudFactor(species, conditions.cloudCover), weight: 1.0 },
+    lufttrykk: { ...pressureFactor(conditions.pressure, conditions.pressureTrend), weight: 1.2 },
+    vind: { ...windFactor(conditions.windSpeed), weight: 1.0 },
+    nedbør: { ...precipFactor(conditions.precip), weight: 0.6 },
+    sesong: { ...seasonFactor(species, month), weight: 1.5 },
+  };
+  let wsum = 0;
+  let total = 0;
+  for (const f of Object.values(factors)) {
+    total += f.score * f.weight;
+    wsum += f.weight;
+  }
+  let activityIndex = Math.round((total / wsum) * 100);
+
+  // Passer ikke arten dette vannet (f.eks. gjedde valgt i åpent hav) → kraftig
+  // nedjustering, men vi sperrer ikke – brukeren kan vite noe vi ikke vet.
+  if (!habitatMatch) activityIndex = Math.round(activityIndex * 0.35);
+
+  let activityLabel;
+  if (activityIndex >= 78) activityLabel = 'Utmerket – grip stanga!';
+  else if (activityIndex >= 62) activityLabel = 'Gode forhold';
+  else if (activityIndex >= 45) activityLabel = 'Middels – jobb for fisken';
+  else activityLabel = 'Krevende – tålmodighet kreves';
+
+  // --- rangér agn ---
+  const ctx = { light, clarity, waterTemp };
+  const ranked = Object.values(LURE_TYPES)
+    .map((l) => lureScore(l, species, ctx))
+    .filter(Boolean)
+    .sort((a, b) => b.score - a.score);
+
+  const depth = depthAdvice(species, waterTemp);
+  const colors = pickColors(light, clarity);
+  const [smin, smax] = species.sizeRange;
+
+  const lures = ranked.slice(0, 4).map((l, i) => ({
+    rank: i + 1,
+    ...l,
+    suggestedSize: `${smin}-${smax} g`,
+    suggestedColors: colors.slice(0, 3),
+    suggestedDepth: depth.label,
+    suggestedRetrieve: retrieveAdvice(waterTemp, LURE_TYPES[l.id]),
+  }));
+
+  // --- tips & triks ---
+  const tips = buildTips(species, {
+    waterTemp, clarity, light, salinity, waterType, habitatMatch, depth, conditions,
+  });
+
+  return {
+    species: {
+      id: species.id, name: species.name, nameEn: species.nameEn,
+      salinity: species.salinity, waters: species.waters,
+    },
+    activityIndex,
+    activityLabel,
+    waterTemp,
+    waterTempEstimated: conditions.waterTemp == null,
+    waterClarity: clarity,
+    salinity,
+    waterType,
+    habitatMatch,
+    factors,
+    lures,
+    palette: colors,
+    depth,
+    tips,
+  };
+}
+
+// Generelle tips & triks (egne) som dryppes inn ut fra forholdene.
+const GENERAL_TIPS = [
+  'Bytt farge før du bytter plass – ofte er det fargen, ikke fisken, som mangler.',
+  'Varier innspinningen: pauser, rykk og fartsendring trigger reaksjonshugg.',
+  'Fisk de første og siste lystimene hardest – da eter rovfisken mest.',
+  'Kryss av hvor du får hugg/følge – fisken står sjelden tilfeldig.',
+];
+
+function buildTips(species, c) {
+  const tips = [];
+  // artens egen kunnskap + 2 egne pro-tips
+  tips.push(species.notes);
+  if (species.proTips) tips.push(...species.proTips.slice(0, 2));
+
+  if (!c.habitatMatch) {
+    tips.unshift(
+      `⚠️ ${species.name} hører normalt hjemme i ${species.salinity.map(salLabel).join('/')} – ` +
+      `du har valgt ${salLabel(c.salinity)}. Sjansen er liten, men lokal kunnskap kan overraske.`
+    );
+  }
+
+  // vanntype-spesifikt
+  if (c.salinity === 'brackish') {
+    tips.push('Brakkvann: fisk rundt elvemunningen ved tidevannsskifte – næring samler seg der fersk og salt møtes.');
+  }
+  if (c.waterType === 'river' || c.waterType === 'stream') {
+    tips.push('I rennende vann: les strømmen og fisk standplassene bak steiner, i bakevjer og strømkanter.');
+  }
+  if (['sea', 'coast', 'fjord'].includes(c.waterType)) {
+    tips.push('I sjøen: følg tidevannet – inn- og utgående strøm setter fart på byttefisken og utløser bett.');
+  }
+  if (c.waterType === 'lake') {
+    tips.push('I innsjø: let etter kanter, grunner og innløp/utløp – der konsentreres både næring og fisk.');
+  }
+
+  // forholdsbaserte
+  if (c.depth.note) tips.push(c.depth.note);
+  if (c.light.nearGoldenHour) tips.push('Du er i den gylne timen – maksimal innsats de neste ~60 min.');
+  if (c.waterTemp != null && c.waterTemp < 6) tips.push('Kaldt vann: senk farten dramatisk og gi lange pauser mellom taka.');
+  if (c.waterTemp != null && c.waterTemp > 19) tips.push('Varmt vann: fisk dypere/kjøligere lag, eller de kjølige morgen- og kveldstimene.');
+  if (c.conditions.windSpeed != null && c.conditions.windSpeed > 8) tips.push('Mye vind: fisk lo-siden og bruk tyngre agn for kontroll og kastelengde.');
+  if (c.conditions.windSpeed != null && c.conditions.windSpeed >= 2 && c.conditions.windSpeed <= 6) tips.push('Lett krusning: dette er ofte de beste forholdene – fisken er modigere.');
+  if (c.clarity === 'murky') tips.push('Dårlig sikt: velg agn med vibrasjon/lyd og sterke signalfarger.');
+  if (c.clarity === 'clear') tips.push('Klart vann: gå ned i agnstørrelse, bruk naturlige farger og lengre kast.');
+  if (c.conditions.pressureTrend === 'falling') tips.push('Fallende lufttrykk: fisk nå – bettet er ofte best like før været slår om.');
+
+  // én roterende generell tips
+  tips.push(GENERAL_TIPS[(species.id.length + (c.conditions.month || 0)) % GENERAL_TIPS.length]);
+
+  // fjern duplikater og tomme
+  return [...new Set(tips.filter(Boolean))];
+}
+
+function salLabel(s) {
+  return { fresh: 'ferskvann', salt: 'saltvann', brackish: 'brakkvann' }[s] || s;
+}
+
+
+
+// ===== datalag (browser, erstatter serveren) =====
+const _areaCache = new Map();
+
+async function fetchWeatherBrowser(lat, lon) {
+  const url = 'https://api.met.no/weatherapi/locationforecast/2.0/compact?lat=' + lat + '&lon=' + lon;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error('met.no ' + res.status);
+  const json = await res.json();
+  const series = json.properties.timeseries;
+  const now = series[0].data.instant.details;
+  const later = series.find((s) => new Date(s.time) - new Date(series[0].time) >= 6 * 3600 * 1000);
+  let pressureTrend = 'steady';
+  if (later) {
+    const diff = later.data.instant.details.air_pressure_at_sea_level - now.air_pressure_at_sea_level;
+    if (diff <= -1.5) pressureTrend = 'falling';
+    else if (diff >= 1.5) pressureTrend = 'rising';
+  }
+  const precip = (series[0].data.next_1_hours && series[0].data.next_1_hours.details && series[0].data.next_1_hours.details.precipitation_amount)
+    ?? (series[0].data.next_6_hours && series[0].data.next_6_hours.details && series[0].data.next_6_hours.details.precipitation_amount) ?? 0;
+  return {
+    source: 'met.no',
+    updatedAt: json.properties.meta.updated_at,
+    airTemp: now.air_temperature,
+    cloudCover: now.cloud_area_fraction,
+    windSpeed: now.wind_speed,
+    pressure: now.air_pressure_at_sea_level,
+    pressureTrend,
+    precip,
+    symbol: (series[0].data.next_1_hours && series[0].data.next_1_hours.summary && series[0].data.next_1_hours.summary.symbol_code)
+      ?? (series[0].data.next_6_hours && series[0].data.next_6_hours.summary && series[0].data.next_6_hours.summary.symbol_code) ?? null,
+  };
+}
+
+async function getConditionsBrowser(lat, lon) {
+  const date = new Date();
+  const light = lightConditions(date, lat, lon);
+  let weather = null, weatherError = null;
+  try { weather = await fetchWeatherBrowser(lat, lon); }
+  catch (e) { weatherError = e.message; }
+  return { lat, lon, time: date.toISOString(), month: date.getMonth() + 1, light, weather, weatherError };
+}
+
+async function getAreaBrowser(lat, lon) {
+  const key = lat.toFixed(4) + ',' + lon.toFixed(4);
+  if (_areaCache.has(key)) return _areaCache.get(key);
+  const q = buildOverpassQuery(lat, lon);
+  const endpoints = ['https://overpass-api.de/api/interpreter', 'https://overpass.kumi.systems/api/interpreter'];
+  let lastErr;
+  for (const url of endpoints) {
+    try {
+      const res = await fetch(url + '?data=' + encodeURIComponent(q));
+      if (!res.ok) throw new Error('Overpass ' + res.status);
+      const json = await res.json();
+      const water = classifyArea(json.elements || []);
+      const matchingSpecies = (water.salinity && water.salinity !== 'unknown')
+        ? speciesForWater(water.salinity, water.type) : [];
+      const out = { water, matchingSpecies };
+      _areaCache.set(key, out);
+      return out;
+    } catch (e) { lastErr = e; }
+  }
+  throw lastErr || new Error('Overpass utilgjengelig');
+}
+
+
+// app.standalone.js – frontend for den selvstendige fiskeguru.html.
+// Kaller motoren direkte (recommend/listSpecies/…) og met.no/Overpass via CORS.
+
+const state = { lat: null, lon: null, conditions: null, species: [], area: null };
+
+// --- kart ---
+const map = L.map('map').setView([63.43, 10.39], 5);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  maxZoom: 18, attribution: '© OpenStreetMap',
+}).addTo(map);
+
+let marker = null;
+function setLocation(lat, lon, zoom) {
+  state.lat = lat; state.lon = lon;
+  if (marker) marker.setLatLng([lat, lon]);
+  else marker = L.marker([lat, lon]).addTo(map);
+  if (zoom) map.setView([lat, lon], zoom);
+  document.getElementById('coords').textContent = `${lat.toFixed(4)}, ${lon.toFixed(4)}`;
+  loadConditions();
+  loadArea();
+  refreshCalcButton();
+}
+
+map.on('click', (e) => setLocation(e.latlng.lat, e.latlng.lng));
+
+document.getElementById('geo-btn').addEventListener('click', () => {
+  if (!navigator.geolocation) return alert('Geolokasjon støttes ikke av nettleseren.');
+  navigator.geolocation.getCurrentPosition(
+    (pos) => setLocation(pos.coords.latitude, pos.coords.longitude, 11),
+    () => alert('Klarte ikke hente posisjon (på file:// er dette ofte sperret). Klikk i kartet i stedet.')
+  );
+});
+
+// --- forhold ---
+async function loadConditions() {
+  const card = document.getElementById('conditions-card');
+  card.innerHTML = '<p class="placeholder spin">Henter vær og lysforhold…</p>';
+  try {
+    const data = await getConditionsBrowser(state.lat, state.lon);
+    state.conditions = data;
+    renderConditions(data);
+  } catch (e) {
+    card.innerHTML = `<p class="placeholder">Klarte ikke hente forhold (${e.message}). Du kan fortsatt beregne med manuelle verdier.</p>`;
+  }
+}
+
+function fmtTime(iso) {
+  if (!iso) return '–';
+  return new Date(iso).toLocaleTimeString('no-NO', { hour: '2-digit', minute: '2-digit' });
+}
+
+function renderConditions(d) {
+  const card = document.getElementById('conditions-card');
+  const w = d.weather, l = d.light;
+  const cells = [];
+  cells.push(cell('Lys', l.label, l.nearGoldenHour ? '✨ gylden time' : `sol ${l.sunAltitude}°`));
+  if (l.polar) cells.push(cell('Spesielt', l.polar === 'midnattssol' ? 'Midnattssol' : 'Mørketid', ''));
+  cells.push(cell('Soloppg.', fmtTime(l.sunrise), ''));
+  cells.push(cell('Solnedg.', fmtTime(l.sunset), ''));
+  if (w) {
+    cells.push(cell('Lufttemp', `${w.airTemp}°C`, ''));
+    cells.push(cell('Skydekke', `${Math.round(w.cloudCover)}%`, w.symbol || ''));
+    cells.push(cell('Vind', `${w.windSpeed} m/s`, ''));
+    cells.push(cell('Lufttrykk', `${Math.round(w.pressure)} hPa`, trendLabel(w.pressureTrend)));
+    cells.push(cell('Nedbør', `${w.precip} mm`, ''));
+  }
+  let banner = '';
+  if (d.weatherError) banner = `<div class="warn-banner">⚠️ Fikk ikke live værdata (${d.weatherError}). Bruk manuelle verdier under for best resultat.</div>`;
+  card.innerHTML = banner + `<div class="cond-grid">${cells.join('')}</div>`;
+}
+
+function cell(k, v, sub) {
+  return `<div class="cond"><div class="k">${k}</div><div class="v">${v}</div>${sub ? `<div class="k">${sub}</div>` : ''}</div>`;
+}
+function trendLabel(t) { return { falling: '↓ fallende', rising: '↑ stigende', steady: '→ stabilt' }[t] || ''; }
+
+// --- område / vanntype ---
+const SAL_ICON = { fresh: '🟦', salt: '🌊', brackish: '🟩', unknown: '❔' };
+
+async function loadArea() {
+  const card = document.getElementById('area-card');
+  card.hidden = false;
+  card.innerHTML = '<span class="spin">Sjekker hva slags vann dette er…</span>';
+  try {
+    const data = await getAreaBrowser(state.lat, state.lon);
+    state.area = data;
+    renderArea(data);
+    rebuildSpeciesDropdown(data.matchingSpecies || []);
+  } catch (e) {
+    card.innerHTML = `<span class="muted">Kunne ikke avgjøre vanntype (${e.message}). Velg evt. manuelt under «Juster forhold».</span>`;
+  }
+}
+
+function renderArea(data) {
+  const card = document.getElementById('area-card');
+  const w = data.water;
+  if (!w || w.salinity === 'unknown') {
+    card.innerHTML = `<span class="muted">❔ Fant ikke en tydelig vannforekomst her. Klikk midt i vannet, eller sett vanntype manuelt under «Juster forhold».</span>`;
+    return;
+  }
+  const nearby = (w.nearby && w.nearby.length)
+    ? `<div class="area-nearby">I området: ${w.nearby.map((n) => `<span class="chip">${n}</span>`).join(' ')}</div>` : '';
+  card.innerHTML = `
+    <div class="area-head">
+      <span class="area-badge sal-${w.salinity}">${SAL_ICON[w.salinity] || ''} ${w.salinityLabel}</span>
+      <span class="area-type">${w.typeLabel}${w.name ? ` · <b>${w.name}</b>` : ''}</span>
+      <span class="area-conf">${confLabel(w.confidence)}</span>
+    </div>
+    ${w.note ? `<p class="area-note">${w.note}</p>` : ''}${nearby}`;
+}
+function confLabel(c) { return { high: '✓ sikker', medium: '≈ ganske sikker', low: '? usikker' }[c] || ''; }
+
+// --- arter ---
+function loadSpecies() {
+  state.species = listSpecies();
+  rebuildSpeciesDropdown([]);
+}
+function addOption(group, s) {
+  const o = document.createElement('option');
+  o.value = s.id; o.textContent = s.name; group.appendChild(o);
+}
+function rebuildSpeciesDropdown(matchingIds) {
+  const sel = document.getElementById('species-select');
+  const current = sel.value;
+  sel.innerHTML = '<option value="">Velg art…</option>';
+  if (matchingIds && matchingIds.length) {
+    const fit = document.createElement('optgroup');
+    fit.label = `🎯 Passer her (${(state.area && state.area.water && state.area.water.salinityLabel) || ''})`;
+    state.species.filter((s) => matchingIds.includes(s.id)).forEach((s) => addOption(fit, s));
+    sel.appendChild(fit);
+    const rest = state.species.filter((s) => !matchingIds.includes(s.id));
+    if (rest.length) {
+      const og = document.createElement('optgroup');
+      og.label = 'Andre arter';
+      rest.forEach((s) => addOption(og, s));
+      sel.appendChild(og);
+    }
+  } else {
+    for (const [key, label] of [['fresh', 'Ferskvann'], ['salt', 'Saltvann']]) {
+      const og = document.createElement('optgroup');
+      og.label = label;
+      state.species.filter((s) => s.salinity && s.salinity[0] === key).forEach((s) => addOption(og, s));
+      if (og.children.length) sel.appendChild(og);
+    }
+  }
+  if (current) sel.value = current;
+}
+
+document.getElementById('species-select').addEventListener('change', (e) => {
+  const s = state.species.find((x) => x.id === e.target.value);
+  document.getElementById('species-note').textContent = s ? s.notes : '';
+  refreshCalcButton();
+});
+
+function refreshCalcButton() {
+  const hasSpecies = !!document.getElementById('species-select').value;
+  document.getElementById('calc-btn').disabled = !(state.lat != null && hasSpecies);
+}
+
+// --- beregning (lokalt, ingen server) ---
+document.getElementById('calc-btn').addEventListener('click', () => {
+  const speciesId = document.getElementById('species-select').value;
+  const btn = document.getElementById('calc-btn');
+
+  const air = parseFloat(document.getElementById('ov-air').value);
+  const wind = parseFloat(document.getElementById('ov-wind').value);
+  const water = parseFloat(document.getElementById('ov-water').value);
+  const clarity = document.getElementById('ov-clarity').value;
+  const ovSal = document.getElementById('ov-salinity').value;
+
+  const c = state.conditions || {};
+  const w = c.weather || {};
+  const aw = state.area && state.area.water;
+  const salinity = ovSal || (aw && aw.salinity !== 'unknown' ? aw.salinity : null);
+  const waterType = ovSal ? null : (aw && aw.type) || null;
+
+  const conditions = {
+    month: c.month || (new Date().getMonth() + 1),
+    light: c.light || lightConditions(new Date(), state.lat, state.lon),
+    airTemp: !Number.isNaN(air) ? air : (w.airTemp ?? null),
+    cloudCover: w.cloudCover ?? null,
+    windSpeed: !Number.isNaN(wind) ? wind : (w.windSpeed ?? null),
+    pressure: w.pressure ?? null,
+    pressureTrend: w.pressureTrend || 'steady',
+    precip: w.precip ?? null,
+    waterTemp: !Number.isNaN(water) ? water : null,
+    waterClarity: clarity,
+    salinity: salinity || null,
+    waterType,
+  };
+
+  try {
+    const result = recommend(speciesId, conditions);
+    renderResult({ result });
+  } catch (e) {
+    alert('Beregning feilet: ' + e.message);
+  }
+  btn.blur();
+});
+
+function renderResult(data) {
+  const res = data.result;
+  const el = document.getElementById('result');
+  const panel = document.getElementById('step-result');
+  panel.hidden = false;
+
+  const gauge = `
+    <div class="gauge">
+      <div class="gauge-ring" style="--val:${res.activityIndex}">${res.activityIndex}</div>
+      <div class="gauge-text">
+        <div class="lbl">${res.activityLabel}</div>
+        <div class="sub">Aktivitetsindeks for ${res.species.name.toLowerCase()} ·
+          ${salText(res.salinity)} · vanntemp ${res.waterTemp ?? '?'}°C${res.waterTempEstimated ? ' (estimert)' : ''} ·
+          ${clarityLabel(res.waterClarity)}</div>
+      </div>
+    </div>`;
+
+  const habitatWarn = res.habitatMatch === false
+    ? `<div class="warn-banner">⚠️ ${res.species.name} hører normalt ikke hjemme i ${salText(res.salinity)} – indeksen er kraftig nedjustert.</div>` : '';
+
+  const lures = res.lures.map((l) => `
+    <div class="lure ${l.rank === 1 ? 'top' : ''}">
+      <div class="lure-head">
+        <span><span class="rank">#${l.rank}</span> <span class="lure-name">${l.name}</span></span>
+        <span class="lure-score">${l.score}</span>
+      </div>
+      <p class="lure-blurb">${l.blurb}</p>
+      <div class="lure-specs">
+        <span><b>Størrelse:</b> ${l.suggestedSize}</span>
+        <span><b>Dybde:</b> ${l.suggestedDepth}</span>
+        <span><b>Fart:</b> ${l.suggestedRetrieve}</span>
+      </div>
+      <div class="chips">
+        ${l.suggestedColors.map((cc) => `<span class="chip">🎨 ${cc}</span>`).join('')}
+        ${l.reasons.map((r) => `<span class="chip">✓ ${r}</span>`).join('')}
+      </div>
+    </div>`).join('');
+
+  const tips = `<div class="tips"><h3>💡 Tips & triks</h3><ul>${res.tips.map((t) => `<li>${t}</li>`).join('')}</ul></div>`;
+
+  const factorRows = Object.entries(res.factors).map(([name, f]) => `
+    <div class="factor-row">
+      <span class="fname">${cap(name)}</span>
+      <span class="bar"><span style="width:${Math.round(f.score * 100)}%"></span></span>
+      <span>${Math.round(f.score * 100)}</span>
+    </div>${f.reason ? `<p class="factor-reason">${f.reason}</p>` : ''}`).join('');
+
+  const factors = `<details class="factors"><summary>Hvorfor? Se forholdene som påvirker</summary>${factorRows}</details>`;
+
+  el.innerHTML = habitatWarn + gauge + lures + tips + factors;
+  panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function clarityLabel(c) { return { clear: 'klart vann', stained: 'litt farget vann', murky: 'grumsete vann' }[c] || c; }
+function salText(s) { return { fresh: 'ferskvann', salt: 'saltvann', brackish: 'brakkvann', unknown: 'ukjent vann' }[s] || s; }
+function cap(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
+
+loadSpecies();
+
+//]]>
+  </script>
+</body>
+</html>
